@@ -1,0 +1,5 @@
+
+
+int main() {
+    tuple<int, tuple<int, int>> x;
+}

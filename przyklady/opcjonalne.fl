@@ -1,0 +1,11 @@
+// OPCJONALNE!!
+
+int main() {
+    // Zmienne niemutowalne
+    int const x = 0;
+
+    // for
+    for(i = 10 to 12) {
+        print(toString(i));
+    }
+}

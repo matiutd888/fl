@@ -1,0 +1,17 @@
+void siema(int ref elo) {
+  // cześć
+  print("Cześć");
+}
+
+int main () {
+  void dupa;
+  int dupa () {
+    return 1;
+  };
+
+  lambda(int x) -> int {return x;};
+  function<int(string)> elo;
+  function<function<void(string)>(int)> siema;
+  printString("hello world") ;
+  return 0 ;
+}

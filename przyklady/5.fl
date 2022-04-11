@@ -1,0 +1,30 @@
+int factorial(int n) {
+    
+}
+
+bool isEven(int n) {
+    
+}
+
+bool isEven(int z)
+
+void main() {
+    n = 12;
+
+    // Program obliczający silnię
+    int it = 1;
+    while(it <= n) {
+        it *= it;
+    }
+    print("Factorial = " + toString(it));
+
+    // Program sprawdzający czy liczba jest parzysta
+    if (n % 2 == 0) {
+        print("Liczba parzysta");
+    } elif (n % 2 == 1) {
+        print("Liczba nieparzysta");
+    }
+
+
+
+}

@@ -1,0 +1,36 @@
+int f() {
+    int x = 0;
+    {   
+        x = 1; 
+        int x;
+        {
+            x = 2;
+            string x = "a";
+        }
+        assert(x == 2);
+    }
+    assert(x == 1);
+}
+
+void g(int ref x) {
+    x = x - 1;
+}
+
+void h() {
+    int z = 0;
+    {
+        g(z);
+        assert(z == -1);
+    
+        void g(int ref x) {
+            x = x + 1;
+        };
+        g(z);
+        assert(z == 0);
+    }
+}
+
+void main() {
+    f();
+    h();
+}
