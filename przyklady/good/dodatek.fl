@@ -1,8 +1,9 @@
-int isEven(int x) {
-    return (x == 2);
-}
-
 void main() {
+    
+    int isEven(int x) {
+        return (x == 2);
+    };
+
 
     // Funkcja wbudowana assert kończy program w zależności od boola
     assert(isEven(4)); 
@@ -15,5 +16,4 @@ void main() {
 
     // Konkatenacja stringów.
     print("hello" + " world!");
-
 }

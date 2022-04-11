@@ -6,9 +6,6 @@ Program.   Program ::= [TopDef] ;
 
 FnDef.	   TopDef ::= Type Ident "(" [Arg] ")" Block ;
 
--- [M] dodatek, zmienne globalne.
--- GlobalDef. TopDef ::= Decl;
-
 -- [M] Wyrażenia lambda.
 
 Lambda. Lambda ::= "lambda:" "(" [Arg] ")" "->" Type Block;
@@ -53,6 +50,7 @@ separator nonempty Item "," ;
 -- [M] Przypisywanie do krotek
 
 TupleIdentDupa. TupleIdent ::= Ident;
+
 TupleRec. TupleIdent ::= "<" [TupleIdent] ">";
 
 separator nonempty TupleIdent ",";

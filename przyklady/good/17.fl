@@ -1,3 +1,4 @@
+// Lambda, closure.
 function<int()> counter(function<int()> initialValueGenerator) {
     int x = initialValueGenerator() - 1;
     return lambda: () -> int {
@@ -6,10 +7,12 @@ function<int()> counter(function<int()> initialValueGenerator) {
     };
 }
 
+
+// Undefined behaviour
 function<void(int)> g(int ref x) {
-	return lambda: (int c) void -> {
+	return lambda: (int c)  -> void {
 		print(x);
-		x += c;
+		x = x + c;
 	};
 }
 
@@ -26,7 +29,7 @@ void main() {
     function<void(int)> z;
 	{
 		int x = 12;
-		z = f(x);
+		z = g(x);
 	}
 	z(10);
 }
