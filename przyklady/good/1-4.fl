@@ -36,4 +36,17 @@ void main () {
 
     // Konkatenacja stringów
     print("foo " + "bar");
+
+    int f(int ref p) {
+        p = p + 1;
+        return p;
+    };
+
+    int x = 4;
+    // Wyświetli 10. (5 + 5)
+    print(toString(f(x) + x));
+
+    int y = 4;
+    // Wyświetli 9. (4 + 5)
+    print(toString(y + f(y)));
 }

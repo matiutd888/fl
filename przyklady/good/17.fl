@@ -7,8 +7,15 @@ function<int()> counter(function<int()> initialValueGenerator) {
     };
 }
 
+// Typ z referencją.
+function<void(int ref)> adder(int c) {
+    return lambda: (int ref x) -> void {
+        x = x + c;
+    };
+}
 
-// Undefined behaviour
+
+// Undefined behaviour.
 function<void(int)> g(int ref x) {
 	return lambda: (int c)  -> void {
 		print(x);
@@ -25,11 +32,16 @@ void main() {
     print(toString(f())); // 13
     print(toString(f())); // 14
 
-    // To co zwróci z jest niezdefiniowane.
+    function<void(int ref)> p = adder(10);
+    int x = 0;
+    p(x);
+    assert(x == 10);
+
+    // Undefined behaviour - to co zwróci z jest niezdefiniowane.
     function<void(int)> z;
 	{
 		int x = 12;
 		z = g(x);
-	}
+	}   
 	z(10);
 }

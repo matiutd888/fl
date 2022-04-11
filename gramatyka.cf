@@ -12,14 +12,18 @@ Lambda. Lambda ::= "lambda:" "(" [Arg] ")" "->" Type Block;
 
 separator nonempty TopDef "" ;
 
-Arg. 	   Arg ::= Type Ident;
+ArgT.  ArgType ::= Type;
+
+ArgRef. ArgType ::= Type "ref";
+
+separator ArgType "," ;
 
 -- [M] Referencje.
 
-ArgRef.    Arg ::= Type "ref" Ident;
-
+Arg.    Arg ::= ArgType Ident;
 
 separator  Arg "," ;
+
 
 -- statements ----------------------------------------------
 
@@ -97,7 +101,7 @@ Tuple.     Type ::= "tuple" "<" [Type] ">" ;
 
 -- [M] Typ funkcji.
 
-Function. Type ::= "function" "<" Type "(" [Type] ")" ">";
+Function. Type ::= "function" "<" Type "(" [ArgType] ")" ">";
 
 separator  Type "," ;
 
