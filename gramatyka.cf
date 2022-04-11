@@ -10,6 +10,7 @@ FnDef.	   TopDef ::= Type Ident "(" [Arg] ")" Block ;
 -- GlobalDef. TopDef ::= Decl;
 
 -- [M] Wyrażenia lambda.
+
 Lambda. Lambda ::= "lambda:" "(" [Arg] ")" "->" Type Block;
 
 separator nonempty TopDef "" ;
@@ -35,7 +36,7 @@ BStmt.     Stmt ::= Block ;
 
 Decl.      Decl ::= Type [Item] ";" ;
 
--- [M] dodatek, zmienne niemutowalne
+-- [M] Dodatek, zmienne niemutowalne
 
 ConstDecl. Decl ::= "const" Type [Item] ";";
  
@@ -49,7 +50,7 @@ Init.      Item ::= Ident "=" Expr ;
 
 separator nonempty Item "," ;
 
--- [M] przypisywanie do krotek
+-- [M] Przypisywanie do krotek
 
 TupleIdentDupa. TupleIdent ::= Ident;
 TupleRec. TupleIdent ::= "<" [TupleIdent] ">";
@@ -74,16 +75,6 @@ Cond.      Stmt ::= "if" "(" Expr ")" "{" Stmt  "}";
 
 
 CondElse.  Stmt ::= "if" "(" Expr ")" "{" Stmt "}" "else" "{" Stmt "}"  ;
-
--- [M] dodatek, e else ifa
-
--- Cond.      Stmt ::= "if" "(" Expr ")" "{" Stmt  "}" Elif;
-
--- Elif.    Elif ::= "elif" "(" Expr ")" "{" Stmt "}" Elif ; 
-
--- Else.    Elif ::= "else" "{" Stmt "}";
-
--- EmptyIf.       Elif ::= "";
 
 
 While.     Stmt ::= "while" "(" Expr ")" Stmt ;
@@ -114,7 +105,7 @@ separator  Type "," ;
 
 -- Expressions ---------------------------------------------
 
--- TODO dodać get value by index
+-- [M] Być może to będzie deklaracja reguły dla dostępu do wartości krotki poprzez index.
 
 ETuple. Expr6 ::= "[" [Expr] "]" ;
 
@@ -125,6 +116,8 @@ ELitInt.   Expr6 ::= Integer ;
 ELitTrue.  Expr6 ::= "true" ;
 
 ELitFalse. Expr6 ::= "false" ;
+
+-- [M] Wyrażenia lambda.
 
 ELambda.    Expr6 ::= Lambda;
 
@@ -176,7 +169,9 @@ EQU.       RelOp ::= "==" ;
 NE.        RelOp ::= "!=" ;
 
 -- [M] pomysł, podnoszenie do potęgi
+
 POW.       RelOp ::= "^";
+
 -- comments ------------------------------------------------
 
 comment    "#" ;

@@ -1,0 +1,32 @@
+function<int()> counter(function<int()> initialValueGenerator) {
+    int x = initialValueGenerator() - 1;
+    return lambda: () -> int {
+        x = x + 1;
+        return x;
+    };
+}
+
+function<void(int)> g(int ref x) {
+	return lambda: (int c) void -> {
+		print(x);
+		x += c;
+	};
+}
+
+void main() {
+    function<int()> f = counter(lambda: () -> int {
+        return 12;
+    } );
+
+    print(toString(f())); // 12
+    print(toString(f())); // 13
+    print(toString(f())); // 14
+
+    // To co zwróci z jest niezdefiniowane.
+    function<void(int)> z;
+	{
+		int x = 12;
+		z = f(x);
+	}
+	z(10);
+}

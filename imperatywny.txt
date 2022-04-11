@@ -1,0 +1,25 @@
+  Na 15 punktów
+  01 (trzy typy) DONE
+  02 (literały, arytmetyka, porównania) DONE
+  03 (zmienne, przypisanie) DONE
+  04 (print) DONE
+  05 (while, if) DONE
+  06 (funkcje lub procedury, rekurencja) DONE
+  07 (przez zmienną / przez wartość / in/out) DONE
+  08 (zmienne read-only i pętla for / przekazywanie przez referencję) DONE
+  Na 20 punktów
+  09 (przesłanianie i statyczne wiązanie) DONE
+  10 (obsługa błędów wykonania) DONE
+  11 (funkcje zwracające wartość) DONE
+  Na 30 punktów
+  12 (4) (statyczne typowanie) DONE
+  13 (2) (funkcje zagnieżdżone ze statycznym wiązaniem) DONE
+  14 (1/2) (rekordy/listy/tablice/tablice wielowymiarowe)
+  15 (2) (krotki z przypisaniem) DONE
+  16 (1) (break, continue)
+  17 (4) (funkcje wyższego rzędu, anonimowe, domknięcia) DONE
+  18 (3) (generatory)
+
+Razem: ...
+
+

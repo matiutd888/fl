@@ -21,7 +21,7 @@ void main() {
     // Program sprawdzający czy liczba jest parzysta
     if (n % 2 == 0) {
         print("Liczba parzysta");
-    } elif (n % 2 == 1) {
+    } else (n % 2 == 1) {
         print("Liczba nieparzysta");
     }
 
