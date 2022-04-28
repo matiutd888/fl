@@ -53,7 +53,7 @@ separator nonempty Item "," ;
 
 -- [M] Przypisywanie do krotek
 
-TupleIdentDupa. TupleIdent ::= Ident;
+TupleIdent. TupleIdent ::= Ident;
 
 TupleRec. TupleIdent ::= "<" [TupleIdent] ">";
 
@@ -93,7 +93,7 @@ Bool.      Type ::= "bool" ;
 
 Void.      Type ::= "void" ;
 
-internal   Fun. Type ::= Type "(" [Type] ")" ;
+-- internal   Fun. Type ::= Type "(" [Type] ")" ;
 
 -- [M] Tuple.
 
