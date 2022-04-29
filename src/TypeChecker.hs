@@ -50,7 +50,20 @@ typeOfExpr (A.ELambda pos (A.Lambda _ arguments retType body))
   -- TODO check if block returns good type!
  = do
   return $ Function pos retType $ getArgType <$> arguments
-typeOfExpr (A.EAppIdent pos Ident)
+typeOfExpr (A.EApp pos callee args) = do   
+  case typeOfExpr callee of
+    -- TODO retType pos should be changed to `pos`.
+    A.Function _ retType params -> (checkArgsCorrectness params args) >>= (\_ -> return retType) 
+    _ -> throwError $ notAFunctionMessage callee
+
+checkArgsCorrectness :: MonadError String m => [ArgType] -> [Expr] -> m () 
+checkArgsCorrectness params args = do
+
+
+checkArgCorrectness arg | A.ArgRef pos type = do
+
+
+
 getArgType :: A.Arg -> ArgType
 getArgType (Arg _ t _) = t
 
@@ -67,30 +80,64 @@ typeOfBinOp checkFunction typeConstructor pos e1 e2 = do
   return $ typeConstructor pos
 
 -- TODO jak to przerobić?
-checkForBool :: MonadError String m => Type -> m ()
+checkForBool :: MonadError String m => A.Type -> m ()
 checkForBool t =
   case t of
     A.Bool _ -> return ()
-    t -> throwError (errorMessage1 t $ A.Bool $ A.hasPosition t)
+    _ -> throwError (errorMessage1 t $ A.Bool $ A.hasPosition t)
 
-checkForInt :: MonadError String m => Type -> m ()
+checkForInt :: MonadError String m => A.Type -> m ()
 checkForInt t =
   case t of
     A.Int _ -> return ()
-    t -> throwError (errorMessage1 t $ A.Int $ A.hasPosition t)
+    _ -> throwError (errorMessage1 t $ A.Int $ A.hasPosition t)
 
-errorMessage1 :: Type -> Type -> String
+checkForVar :: MonadError String m => A.Type -> m ()
+checkForVar t =
+  case t of 
+    A.EVar _ -> return ()
+    _ -> throwError (errorMessage1 t $ A.Bool $ A.hasPosition t)
+
+errorMessage1 :: A.Type -> A.Type -> String
 errorMessage1 received expected =
   unexpectedTypeMessage received ++ ", " ++ (expectedTypeMessage expected)
 
+showPositionOf :: A.HasPosition a => a -> String
+showPositionOf x = (show $ A.hasPosition x) ++ ": "
+
+showPosition :: BNFC'Position -> String 
+showPosition pos = show pos ++ ": "
+
 unexpectedTypeMessage :: Type -> String
 unexpectedTypeMessage t =
-  "unexpected type " ++
-  printTree t ++ " on position " ++ (show $ A.hasPosition t)
+  showPositionOf t ++ "unexpected type " ++ printTree t  
 
 expectedTypeMessage :: Type -> String
 expectedTypeMessage t = "expected type " ++ printTree t
 
 undefinedReferenceMessage :: Ident -> BNFC'Position -> String
 undefinedReferenceMessage ident pos =
-  "undefined reference " ++ show ident ++ " at " ++ (show pos)
+  showPosition pos ++ "undefined reference " ++ show ident
+
+notAFunctionMessage :: Expr -> String 
+notAFunctionMessage expr = 
+  showPositionOf expr ++ " applying argument to expression that is not a function!"
+
+isType :: A.Type -> (BNFC'Position -> A.Type) -> Bool
+isType t1 t2 = typesEq t1 $ t2 BNFC'Position
+
+typesEq :: A.Type -> A.Type -> Bool
+typesEq (A.Int _) (A.Int _) = True
+typesEq (A.Str _) (A.Str _) = True
+typesEq (A.Bool _) (A.Bool _) = True
+typesEq (A.Void _) (A.Void _) = True
+typesEq (A.Tuple _ types1) (A.Tuple _ types2) = and $ zipWith typesEq types1 types2
+typesEq (A.Function _ ret1 args1) (A.Function _ ret2 args2) = 
+  typesEq ret1 ret2 && and zipWith paramTypesEqual args1 args2
+typesEq _ _ = False
+
+
+paramTypesEqual :: A.ArgType -> A.ArgType -> Bool
+paramTypesEqual (A.ArgRef _ t1) (A.ArgRef _ t2) = typesEq t1 t2
+paramTypesEqual (A.ArgT _ t1) (A.ArgT _ t2) = typesEq t1 t2
+paramTypesEqual _ _ = False
