@@ -246,7 +246,7 @@ instance Print (AbsGramatyka.Expr' a) where
     AbsGramatyka.ELitTrue _ -> prPrec i 6 (concatD [doc (showString "true")])
     AbsGramatyka.ELitFalse _ -> prPrec i 6 (concatD [doc (showString "false")])
     AbsGramatyka.ELambda _ lambda -> prPrec i 6 (concatD [prt 0 lambda])
-    AbsGramatyka.EApp _ id_ exprs -> prPrec i 6 (concatD [prt 0 id_, doc (showString "("), prt 0 exprs, doc (showString ")")])
+    AbsGramatyka.EApp _ callee exprs -> prPrec i 6 (concatD [prt 0 callee, doc (showString "("), prt 0 exprs, doc (showString ")")])
     AbsGramatyka.EString _ str -> prPrec i 6 (concatD [printString str])
     AbsGramatyka.Neg _ expr -> prPrec i 5 (concatD [doc (showString "-"), prt 6 expr])
     AbsGramatyka.Not _ expr -> prPrec i 5 (concatD [doc (showString "!"), prt 6 expr])
@@ -255,6 +255,11 @@ instance Print (AbsGramatyka.Expr' a) where
     AbsGramatyka.ERel _ expr1 relop expr2 -> prPrec i 2 (concatD [prt 2 expr1, prt 0 relop, prt 3 expr2])
     AbsGramatyka.EAnd _ expr1 expr2 -> prPrec i 1 (concatD [prt 2 expr1, doc (showString "&&"), prt 1 expr2])
     AbsGramatyka.EOr _ expr1 expr2 -> prPrec i 0 (concatD [prt 1 expr1, doc (showString "||"), prt 0 expr2])
+
+instance Print (AbsGramatyka.Callee' a) where
+  prt i = \case
+    AbsGramatyka.LambdaCallee _ lambda -> prPrec i 0 (concatD [prt 0 lambda])
+    AbsGramatyka.IdentCallee _ id_ -> prPrec i 0 (concatD [prt 0 id_])
 
 instance Print [AbsGramatyka.Expr' a] where
   prt _ [] = concatD []
