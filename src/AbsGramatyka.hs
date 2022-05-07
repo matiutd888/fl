@@ -91,7 +91,7 @@ data Expr' a
     | ELitTrue a
     | ELitFalse a
     | ELambda a (Lambda' a)
-    | EApp a Ident [Expr' a]
+    | EApp a (Callee' a) [Expr' a]
     | EString a String
     | Neg a (Expr' a)
     | Not a (Expr' a)
@@ -100,6 +100,10 @@ data Expr' a
     | ERel a (Expr' a) (RelOp' a) (Expr' a)
     | EAnd a (Expr' a) (Expr' a)
     | EOr a (Expr' a) (Expr' a)
+  deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
+
+type Callee = Callee' BNFC'Position
+data Callee' a = LambdaCallee a (Lambda' a) | IdentCallee a Ident
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 type AddOp = AddOp' BNFC'Position
@@ -213,6 +217,11 @@ instance HasPosition Expr where
     ERel p _ _ _ -> p
     EAnd p _ _ -> p
     EOr p _ _ -> p
+
+instance HasPosition Callee where
+  hasPosition = \case
+    LambdaCallee p _ -> p
+    IdentCallee p _ -> p
 
 instance HasPosition AddOp where
   hasPosition = \case

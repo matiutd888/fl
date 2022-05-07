@@ -1,0 +1,53 @@
+// OPCJONALNE!!
+
+
+// Polimorfizm funkcji, możliwość zrobienia 
+// kilku funkcji o tej samej nazwie. (nie powinno być trudne, raczej zostanie dodane).
+int f(int ref x) {
+    return 1;
+}
+
+int f(int x) {
+    return 2;
+}
+
+int f(string x) {
+    return 3;
+}
+
+
+int main() {
+    // for
+    for(i = 10 to 12) {
+        // i jest read only.
+        print(toString(i));
+    }
+
+    // Dedukcja typu.
+    auto x = f("foo");
+    
+
+    generator<int> infiniteSequence() {
+        int x = 0;
+        while(True) {
+            yield x;
+            x++;
+        }
+    }
+
+    generator<int> z = infiniteSequence();
+    print(toString(next(z)));
+    print(toString(next(z)));
+
+
+    generator<int> range(int l, int r) {
+        for(i = l to r) {
+            yield i;
+        }
+    }
+
+    // Liczby od 1 do 3.
+    forGen(x in range(1, 3)) {
+        print(toString(x));
+    }
+}

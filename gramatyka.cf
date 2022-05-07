@@ -119,11 +119,17 @@ ELitTrue.  Expr6 ::= "true" ;
 
 ELitFalse. Expr6 ::= "false" ;
 
+-- [M] Helper deklaracje.
+
+LambdaCallee. Callee ::= Lambda;
+
+IdentCallee. Callee ::= Ident;
+
 -- [M] Wyrażenia lambda.
 
 ELambda.    Expr6 ::= Lambda;
 
-EApp.      Expr6 ::= Ident "(" [Expr] ")" ;
+EApp.      Expr6 ::= Callee "(" [Expr] ")" ;
 
 EString.   Expr6 ::= String ;
 
