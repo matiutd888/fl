@@ -16,12 +16,19 @@ type TypeMap = M.Map A.Ident A.Type
 
 type ExprTEval a = ReaderT TypeMap (ExceptT String Identity) a
 
+runExprTEval :: TypeMap -> ExprTEval a -> Either String a
+runExprTEval env e = runIdentity (runExceptT (runReaderT e env))
+
+-- Zwraca pozycję wyrażenia!
 typeOfExpr :: A.Expr -> ExprTEval A.Type
 typeOfExpr (A.EVar pos ident) = do
   env <- ask
   case M.lookup ident env of
     Nothing -> throwError $ (undefinedReferenceMessage ident pos) ++ "\n"
+-- TODO w tym miejscu powinienem użyć nowej pozycji.
     Just t -> return t
+    
+    
 -- Literals.
 typeOfExpr (A.ELitTrue pos) = return $ A.Bool pos
 typeOfExpr (A.ELitFalse pos) = return $ A.Bool pos
@@ -33,13 +40,16 @@ typeOfExpr (A.EOr pos e1 e2) = typeOfBinOp A.Bool pos e1 e2
 typeOfExpr (A.EAdd pos e1 _ e2) = typeOfBinOp A.Int pos e1 e2
 typeOfExpr (A.EMul pos e1 _ e2) = typeOfBinOp A.Int pos e1 e2
 typeOfExpr (A.ERel pos e1 _ e2) = typeOfBinOp A.Bool pos e1 e2
+
 -- Unary operator expressions.
 typeOfExpr (A.Not pos e) = do
   typeOfExpr e >>= checkForType A.Bool
   return $ A.Bool pos
+
 typeOfExpr (A.Neg pos e) = do
   typeOfExpr e >>= checkForType A.Int
   return $ A.Int pos
+
 typeOfExpr (A.ETuple pos l)
   -- foldr (liftM2 (:)) (pure []) changes list of monads to monad of list.
   -- http://learnyouahaskell.com/functors-applicative-functors-and-monoids

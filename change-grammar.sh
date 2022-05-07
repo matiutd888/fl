@@ -1,4 +1,4 @@
-bnfc-linux --functor -o build gramatyka.cf
+bnfc-linux -m --functor -o build gramatyka.cf
 cd build
 make
 cd ..
