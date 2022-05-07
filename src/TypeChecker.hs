@@ -50,25 +50,52 @@ typeOfExpr (A.ELambda pos (A.Lambda _ arguments retType body))
   -- TODO check if block returns good type!
  = do
   return $ Function pos retType $ getArgType <$> arguments
-typeOfExpr (A.EApp pos callee args) = do
-  case typeOfExpr callee
+typeOfExpr (A.EApp pos callee args) =
+  -- LambdaCallee a (Lambda' a) | IdentCallee a Ident
+  case callee of
     -- TODO retType pos should be changed to `pos`.
-        of
-    A.Function _ retType params ->
-      (checkArgsCorrectness params args) >>= (\_ -> return retType)
-    _ -> throwError $ notAFunctionMessage callee
+	A.LambdaCallee p l -> do
+		t <- typeOfExpr (A.ELambda p l)
+		handleFunction t args
+	A.IdentCallee p ident -> do
+		t <- typeOfExpr (A.EVar p ident)
+		handleFunction t args
 
-checkArgsCorrectness :: MonadError String m => [ArgType] -> [Expr] -> m ()
-checkArgsCorrectness params args = undefined
+handleFunction :: A.Type -> [A.Expr] -> ExprTEval A.Type
+handleFunction f args = case f of
+    A.Function _ retType params -> (checkArgsCorrectness params args) >>= (\_ -> return retType)
+    _ -> throwError $ notAFunctionMessage f
 
--- TODO tutaj skończyłem
+checkArgsCorrectness :: [A.ArgType] -> [A.Expr] -> ExprTEval ()
+checkArgsCorrectness params args = do 
+  zipWithM checkArgCorrectness args params
+  return ()
+  
+checkArgCorrectness :: A.Expr -> A.ArgType -> ExprTEval ()
 checkArgCorrectness arg param =
   case param of
-    A.ArgRef pos ttype -> error
-    _ -> error--  otherwise = undefined
+    A.ArgRef pos ttype ->
+      case arg of
+        A.EVar _ ident -> do
+          varType <- typeOfExpr arg
+          let paramType = (getTypeFromArgType param)
+          assertM (typesEq varType paramType) (showPositionOf arg ++ errorMessageWrongType paramType varType) 
+        _ -> throwError $ errorWrongArgumentPassedByReference arg param
+    _ ->  do
+			argType <- typeOfExpr arg
+			let paramType = (getTypeFromArgType param)
+			assertM (typesEq argType paramType) (showPositionOf arg ++ errorMessageWrongType paramType argType) 
+		
+
+assertM :: MonadError String m => Bool -> String -> m ()
+assertM b s = if b then return () else throwError s
 
 getArgType :: A.Arg -> A.ArgType
 getArgType (A.Arg _ t _) = t
+
+getTypeFromArgType :: A.ArgType -> A.Type
+getTypeFromArgType (A.ArgRef _ t) = t
+getTypeFromArgType (A.ArgT _ t) = t
 
 typeOfBinOp ::
      (Type -> ExprTEval ())
@@ -87,22 +114,22 @@ checkForBool :: MonadError String m => A.Type -> m ()
 checkForBool t =
   case t of
     A.Bool _ -> return ()
-    _ -> throwError (errorMessage1 t $ A.Bool $ A.hasPosition t)
+    _ -> throwError (errorMessageWrongType t $ A.Bool $ A.hasPosition t)
 
 checkForInt :: MonadError String m => A.Type -> m ()
 checkForInt t =
   case t of
     A.Int _ -> return ()
-    _ -> throwError (errorMessage1 t $ A.Int $ A.hasPosition t)
+    _ -> throwError (errorMessageWrongType t $ A.Int $ A.hasPosition t)
 
-checkForVar :: MonadError String m => A.Type -> m ()
+{-- checkForVar :: MonadError String m => A.Type -> m ()
 checkForVar t =
   case t of
     A.EVar _ -> return ()
-    _ -> throwError (errorMessage1 t $ A.Bool $ A.hasPosition t)
+    _ -> throwError (errorMessageWrongType t $ A.EVar $ A.hasPosition t) --}
 
-errorMessage1 :: A.Type -> A.Type -> String
-errorMessage1 received expected =
+errorMessageWrongType :: A.Type -> A.Type -> String
+errorMessageWrongType received expected =
   unexpectedTypeMessage received ++ ", " ++ (expectedTypeMessage expected)
 
 showPositionOf :: A.HasPosition a => a -> String
@@ -117,17 +144,22 @@ unexpectedTypeMessage t = showPositionOf t ++ "unexpected type " ++ printTree t
 expectedTypeMessage :: Type -> String
 expectedTypeMessage t = "expected type " ++ printTree t
 
-undefinedReferenceMessage :: Ident -> BNFC'Position -> String
+undefinedReferenceMessage :: A.Ident -> BNFC'Position -> String
 undefinedReferenceMessage ident pos =
   showPosition pos ++ "undefined reference " ++ show ident
 
-notAFunctionMessage :: Expr -> String
+notAFunctionMessage :: A.Type -> String
 notAFunctionMessage expr =
   showPositionOf expr ++
   " applying argument to expression that is not a function!"
 
+errorWrongArgumentPassedByReference :: A.Expr -> ArgType -> String
+errorWrongArgumentPassedByReference expr arg =
+	showPositionOf expr ++ " passing " ++ show expr ++ " as an reference argument "
+	++ show arg ++ ", expected variable type"
+
 isType :: A.Type -> (BNFC'Position -> A.Type) -> Bool
-isType t1 t2 = typesEq t1 $ t2 BNFC'Position
+isType t1 t2 = typesEq t1 $ t2 BNFC'NoPosition
 
 typesEq :: A.Type -> A.Type -> Bool
 typesEq (A.Int _) (A.Int _) = True
@@ -135,9 +167,9 @@ typesEq (A.Str _) (A.Str _) = True
 typesEq (A.Bool _) (A.Bool _) = True
 typesEq (A.Void _) (A.Void _) = True
 typesEq (A.Tuple _ types1) (A.Tuple _ types2) =
-  and $ zipWith typesEq types1 types2
+  and $ Prelude.zipWith typesEq types1 types2
 typesEq (A.Function _ ret1 args1) (A.Function _ ret2 args2) =
-  typesEq ret1 ret2 && and zipWith paramTypesEqual args1 args2
+  typesEq ret1 ret2 && and (Prelude.zipWith paramTypesEqual args1 args2)
 typesEq _ _ = False
 
 paramTypesEqual :: A.ArgType -> A.ArgType -> Bool
