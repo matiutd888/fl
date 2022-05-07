@@ -6,16 +6,16 @@ import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
 
+import Errors
+
 import qualified Data.Map as M
 import Data.Text
-import PrintGramatyka
+
 
 type TypeMap = M.Map A.Ident A.Type
 
 type ExprTEval a = ReaderT TypeMap (ExceptT String Identity) a
 
--- throwIf :: A.Bool -> String -> Except String Identity
--- throwIf b str = if b then throwError str else ()
 typeOfExpr :: A.Expr -> ExprTEval A.Type
 typeOfExpr (A.EVar pos ident) = do
   env <- ask
@@ -28,17 +28,17 @@ typeOfExpr (A.ELitFalse pos) = return $ A.Bool pos
 typeOfExpr (A.ELitInt pos _) = return $ A.Int pos
 typeOfExpr (A.EString pos _) = return $ A.Str pos
 -- Binary operator expressions.
-typeOfExpr (A.EAnd pos e1 e2) = typeOfBinOp checkForBool A.Bool pos e1 e2
-typeOfExpr (A.EOr pos e1 e2) = typeOfBinOp checkForBool A.Bool pos e1 e2
-typeOfExpr (A.EAdd pos e1 _ e2) = typeOfBinOp checkForInt A.Int pos e1 e2
-typeOfExpr (A.EMul pos e1 _ e2) = typeOfBinOp checkForInt A.Int pos e1 e2
-typeOfExpr (A.ERel pos e1 _ e2) = typeOfBinOp checkForInt A.Bool pos e1 e2
+typeOfExpr (A.EAnd pos e1 e2) = typeOfBinOp A.Bool pos e1 e2
+typeOfExpr (A.EOr pos e1 e2) = typeOfBinOp A.Bool pos e1 e2
+typeOfExpr (A.EAdd pos e1 _ e2) = typeOfBinOp A.Int pos e1 e2
+typeOfExpr (A.EMul pos e1 _ e2) = typeOfBinOp A.Int pos e1 e2
+typeOfExpr (A.ERel pos e1 _ e2) = typeOfBinOp A.Bool pos e1 e2
 -- Unary operator expressions.
 typeOfExpr (A.Not pos e) = do
-  typeOfExpr e >>= checkForBool
+  typeOfExpr e >>= checkForType A.Bool
   return $ A.Bool pos
 typeOfExpr (A.Neg pos e) = do
-  typeOfExpr e >>= checkForBool
+  typeOfExpr e >>= checkForType A.Int
   return $ A.Int pos
 typeOfExpr (A.ETuple pos l)
   -- foldr (liftM2 (:)) (pure []) changes list of monads to monad of list.
@@ -51,15 +51,13 @@ typeOfExpr (A.ELambda pos (A.Lambda _ arguments retType body))
  = do
   return $ Function pos retType $ getArgType <$> arguments
 typeOfExpr (A.EApp pos callee args) =
-  -- LambdaCallee a (Lambda' a) | IdentCallee a Ident
   case callee of
-    -- TODO retType pos should be changed to `pos`.
-	A.LambdaCallee p l -> do
-		t <- typeOfExpr (A.ELambda p l)
-		handleFunction t args
-	A.IdentCallee p ident -> do
-		t <- typeOfExpr (A.EVar p ident)
-		handleFunction t args
+    A.LambdaCallee p l -> do
+      t <- typeOfExpr (A.ELambda p l)
+      handleFunction t args
+    A.IdentCallee p ident -> do
+      t <- typeOfExpr (A.EVar p ident)
+      handleFunction t args
 
 handleFunction :: A.Type -> [A.Expr] -> ExprTEval A.Type
 handleFunction f args = case f of
@@ -98,66 +96,19 @@ getTypeFromArgType (A.ArgRef _ t) = t
 getTypeFromArgType (A.ArgT _ t) = t
 
 typeOfBinOp ::
-     (Type -> ExprTEval ())
-  -> (BNFC'Position -> A.Type)
+  (BNFC'Position -> A.Type)
   -> A.BNFC'Position
   -> A.Expr
   -> A.Expr
   -> ExprTEval A.Type
-typeOfBinOp checkFunction typeConstructor pos e1 e2 = do
-  typeOfExpr e1 >>= checkFunction
-  typeOfExpr e2 >>= checkFunction
+typeOfBinOp typeConstructor pos e1 e2 = do
+  typeOfExpr e1 >>= checkForType typeConstructor
+  typeOfExpr e2 >>= checkForType typeConstructor
   return $ typeConstructor pos
 
--- TODO jak to przerobić?
-checkForBool :: MonadError String m => A.Type -> m ()
-checkForBool t =
-  case t of
-    A.Bool _ -> return ()
-    _ -> throwError (errorMessageWrongType t $ A.Bool $ A.hasPosition t)
-
-checkForInt :: MonadError String m => A.Type -> m ()
-checkForInt t =
-  case t of
-    A.Int _ -> return ()
-    _ -> throwError (errorMessageWrongType t $ A.Int $ A.hasPosition t)
-
-{-- checkForVar :: MonadError String m => A.Type -> m ()
-checkForVar t =
-  case t of
-    A.EVar _ -> return ()
-    _ -> throwError (errorMessageWrongType t $ A.EVar $ A.hasPosition t) --}
-
-errorMessageWrongType :: A.Type -> A.Type -> String
-errorMessageWrongType received expected =
-  unexpectedTypeMessage received ++ ", " ++ (expectedTypeMessage expected)
-
-showPositionOf :: A.HasPosition a => a -> String
-showPositionOf x = (show $ A.hasPosition x) ++ ": "
-
-showPosition :: BNFC'Position -> String
-showPosition pos = show pos ++ ": "
-
-unexpectedTypeMessage :: Type -> String
-unexpectedTypeMessage t = showPositionOf t ++ "unexpected type " ++ printTree t
-
-expectedTypeMessage :: Type -> String
-expectedTypeMessage t = "expected type " ++ printTree t
-
-undefinedReferenceMessage :: A.Ident -> BNFC'Position -> String
-undefinedReferenceMessage ident pos =
-  showPosition pos ++ "undefined reference " ++ show ident
-
-notAFunctionMessage :: A.Type -> String
-notAFunctionMessage expr =
-  showPositionOf expr ++
-  " applying argument to expression that is not a function!"
-
-errorWrongArgumentPassedByReference :: A.Expr -> ArgType -> String
-errorWrongArgumentPassedByReference expr arg =
-	showPositionOf expr ++ " passing " ++ show expr ++ " as an reference argument "
-	++ show arg ++ ", expected variable type"
-
+checkForType :: MonadError String m => (BNFC'Position -> A.Type) -> A.Type -> m ()
+checkForType typeConstructor t = assertM (isType t typeConstructor) (errorMessageWrongType t $ typeConstructor $ A.hasPosition t)
+    
 isType :: A.Type -> (BNFC'Position -> A.Type) -> Bool
 isType t1 t2 = typesEq t1 $ t2 BNFC'NoPosition
 
@@ -172,6 +123,7 @@ typesEq (A.Function _ ret1 args1) (A.Function _ ret2 args2) =
   typesEq ret1 ret2 && and (Prelude.zipWith paramTypesEqual args1 args2)
 typesEq _ _ = False
 
+-- TODO użyc tego gdzieś.
 paramTypesEqual :: A.ArgType -> A.ArgType -> Bool
 paramTypesEqual (A.ArgRef _ t1) (A.ArgRef _ t2) = typesEq t1 t2
 paramTypesEqual (A.ArgT _ t1) (A.ArgT _ t2) = typesEq t1 t2
