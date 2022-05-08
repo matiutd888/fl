@@ -201,7 +201,6 @@ instance Print (AbsGramatyka.Stmt' a) where
 instance Print (AbsGramatyka.Decl' a) where
   prt i = \case
     AbsGramatyka.Decl _ type_ items -> prPrec i 0 (concatD [prt 0 type_, prt 0 items, doc (showString ";")])
-    AbsGramatyka.ConstDecl _ type_ items -> prPrec i 0 (concatD [doc (showString "const"), prt 0 type_, prt 0 items, doc (showString ";")])
     AbsGramatyka.FDecl _ type_ id_ args block -> prPrec i 0 (concatD [prt 0 type_, prt 0 id_, doc (showString "("), prt 0 args, doc (showString ")"), prt 0 block, doc (showString ";")])
 
 instance Print (AbsGramatyka.Item' a) where

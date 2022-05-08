@@ -60,7 +60,6 @@ data Stmt' a
 type Decl = Decl' BNFC'Position
 data Decl' a
     = Decl a (Type' a) [Item' a]
-    | ConstDecl a (Type' a) [Item' a]
     | FDecl a (Type' a) Ident [Arg' a] (Block' a)
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
@@ -178,7 +177,6 @@ instance HasPosition Stmt where
 instance HasPosition Decl where
   hasPosition = \case
     Decl p _ _ -> p
-    ConstDecl p _ _ -> p
     FDecl p _ _ _ _ -> p
 
 instance HasPosition Item where

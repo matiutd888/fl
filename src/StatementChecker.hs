@@ -11,7 +11,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Text
 import qualified Data.Map as M
-
+import qualified Data.Set as S
 -- ~ type Stmt = Stmt' BNFC'Position
 -- ~ data Stmt' a
     -- ~ = Empty a DONE
@@ -28,12 +28,20 @@ import qualified Data.Map as M
   -- ~ deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 -- Poziom bloku (liczymy od zera).
-data Env = Env { typeMap :: M.Map A.Ident A.Type, levelMap :: M.Map A.Ident Int, level :: Int, functionType :: A.Type, isConst :: M.Map A.Ident Bool }
+data Env = Env { typeMap :: M.Map A.Ident A.Type, levelMap :: M.Map A.Ident Int, level :: Int, functionType :: A.Type, constSet :: S.Set A.Ident}
 
 type StmtTEval a = StateT Env (ExceptT String Identity) a
 
 incrementBlockLevel :: Env -> Env
 incrementBlockLevel (Env a b c d e) = Env a b (c + 1) d e
+
+insertIntoConstSet :: Ident -> Env -> Env
+insertIntoConstSet ident (Env a b c d constSet) = Env a b c d (S.insert ident constSet)
+
+deleteFromConstSet :: Ident -> Env -> Env
+deleteFromConstSet ident (Env a b c d constSet) = Env a b c d (S.delete ident constSet) 
+
+putIntoTypeMap
 
 typeStmt :: A.Stmt -> StmtTEval ()
 typeStmt (A.Empty _) = return ()
@@ -70,4 +78,6 @@ typeStmt (DeclStmt _ (FDecl pos retType ident params body)) = undefined
 -- Put item in typeMap (and in const map if it is necessary). 
 handleItem :: Bool -> Item -> StmtTEval ()
 handleItem b (NoInit pos ident) = undefined
+
+
 handleItem b (Init pos ident expr) = undefined

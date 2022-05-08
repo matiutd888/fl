@@ -39,7 +39,7 @@ Decl.      Decl ::= Type [Item] ";" ;
 
 -- [M] Dodatek, zmienne niemutowalne
 
-ConstDecl. Decl ::= "const" Type [Item] ";";
+-- ConstDecl. Decl ::= "const" Type [Item] ";";
  
 FDecl.     Decl ::= Type Ident "(" [Arg] ")" Block ";" ;
 
