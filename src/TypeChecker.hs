@@ -1,5 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
+module TypeChecker where
+
 import AbsGramatyka as A
 import Control.Monad.Except
 import Control.Monad.Identity
