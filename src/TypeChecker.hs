@@ -19,13 +19,12 @@ type ExprTEval a = ReaderT TypeMap (ExceptT String Identity) a
 runExprTEval :: TypeMap -> ExprTEval a -> Either String a
 runExprTEval env e = runIdentity (runExceptT (runReaderT e env))
 
--- Zwraca pozycję wyrażenia!
+-- Zawiera pozycję z którego się wzięło wyrażenie.
 typeOfExpr :: A.Expr -> ExprTEval A.Type
 typeOfExpr (A.EVar pos ident) = do
   env <- ask
   case M.lookup ident env of
     Nothing -> throwError $ (undefinedReferenceMessage ident pos) ++ "\n"
--- TODO w tym miejscu powinienem użyć nowej pozycji.
     Just t -> return t
     
     
@@ -43,11 +42,11 @@ typeOfExpr (A.ERel pos e1 _ e2) = typeOfBinOp A.Bool pos e1 e2
 
 -- Unary operator expressions.
 typeOfExpr (A.Not pos e) = do
-  typeOfExpr e >>= checkForType A.Bool
+  typeOfExpr e >>= checkForType A.Bool pos
   return $ A.Bool pos
 
 typeOfExpr (A.Neg pos e) = do
-  typeOfExpr e >>= checkForType A.Int
+  typeOfExpr e >>= checkForType A.Int pos
   return $ A.Int pos
 
 typeOfExpr (A.ETuple pos l)
@@ -87,12 +86,12 @@ checkArgCorrectness arg param =
         A.EVar _ ident -> do
           varType <- typeOfExpr arg
           let paramType = (getTypeFromArgType param)
-          assertM (typesEq varType paramType) (showPositionOf arg ++ errorMessageWrongType paramType varType) 
+          assertM (typesEq varType paramType) (errorMessageWrongType (hasPosition arg) varType paramType) 
         _ -> throwError $ errorWrongArgumentPassedByReference arg param
     _ ->  do
       argType <- typeOfExpr arg
       let paramType = (getTypeFromArgType param)
-      assertM (typesEq argType paramType) (showPositionOf arg ++ errorMessageWrongType paramType argType) 
+      assertM (typesEq argType paramType) (errorMessageWrongType (hasPosition arg) argType paramType) 
     
 
 assertM :: MonadError String m => Bool -> String -> m ()
@@ -112,12 +111,12 @@ typeOfBinOp ::
   -> A.Expr
   -> ExprTEval A.Type
 typeOfBinOp typeConstructor pos e1 e2 = do
-  typeOfExpr e1 >>= checkForType typeConstructor
-  typeOfExpr e2 >>= checkForType typeConstructor
+  typeOfExpr e1 >>= checkForType typeConstructor (hasPosition e1)
+  typeOfExpr e2 >>= checkForType typeConstructor (hasPosition e2)
   return $ typeConstructor pos
 
-checkForType :: MonadError String m => (BNFC'Position -> A.Type) -> A.Type -> m ()
-checkForType typeConstructor t = assertM (isType t typeConstructor) (errorMessageWrongType t $ typeConstructor $ A.hasPosition t)
+checkForType :: MonadError String m => (BNFC'Position -> A.Type) -> BNFC'Position -> A.Type -> m ()
+checkForType typeConstructor pos t = assertM (isType t typeConstructor) (errorMessageWrongType pos t $ typeConstructor pos)
     
 isType :: A.Type -> (BNFC'Position -> A.Type) -> Bool
 isType t1 t2 = typesEq t1 $ t2 BNFC'NoPosition

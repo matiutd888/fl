@@ -3,25 +3,26 @@ module Errors where
 import AbsGramatyka as A
 import PrintGramatyka
 
-errorMessageWrongType :: A.Type -> A.Type -> String
-errorMessageWrongType received expected =
-  unexpectedTypeMessage received ++ ", " ++ (expectedTypeMessage expected)
+errorMessageWrongType :: BNFC'Position -> A.Type -> A.Type -> String
+errorMessageWrongType pos received expected =
+  showPosition pos ++ unexpectedTypeMessage received ++ ", " ++ (expectedTypeMessage expected)
 
 showPositionOf :: A.HasPosition a => a -> String
-showPositionOf x = (show $ A.hasPosition x) ++ ": "
+showPositionOf = showPosition . A.hasPosition
 
 showPosition :: BNFC'Position -> String
-showPosition pos = show pos ++ ": "
+showPosition Nothing = "NoPos: "
+showPosition (Just x) = show x ++ ": "
 
 unexpectedTypeMessage :: Type -> String
-unexpectedTypeMessage t = showPositionOf t ++ "unexpected type " ++ printTree t
+unexpectedTypeMessage t = "unexpected type " ++ printTree t
 
 expectedTypeMessage :: Type -> String
 expectedTypeMessage t = "expected type " ++ printTree t
 
 undefinedReferenceMessage :: A.Ident -> BNFC'Position -> String
-undefinedReferenceMessage ident pos =
-  showPosition pos ++ "undefined reference " ++ show ident
+undefinedReferenceMessage (Ident x) pos =
+  showPosition pos ++ "undefined reference " ++ show x
 
 notAFunctionMessage :: A.Type -> String
 notAFunctionMessage expr =
