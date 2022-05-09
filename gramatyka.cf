@@ -93,6 +93,8 @@ Bool.      Type ::= "bool" ;
 
 Void.      Type ::= "void" ;
 
+internal NoType. Type ::= "()";
+
 -- internal   Fun. Type ::= Type "(" [Type] ")" ;
 
 -- [M] Tuple.
@@ -178,7 +180,7 @@ NE.        RelOp ::= "!=" ;
 
 -- [M] pomysł, podnoszenie do potęgi
 
-POW.       RelOp ::= "^";
+-- POW.       RelOp ::= "^";
 
 -- comments ------------------------------------------------
 

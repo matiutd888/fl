@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module TypeChecker where
+module TypeChecker (ExprEnv (ExprEnv), typesEq, assertM, typeOfExpr, ExprTEval, runExprTEval, getArgType) where
 
 import AbsGramatyka as A
 import Control.Monad.Except
@@ -14,27 +14,30 @@ import qualified Data.Map as M
 import Data.Text
 
 
-type TypeMap = M.Map A.Ident A.Type
+data ExprEnv = ExprEnv { variables :: M.Map A.Ident A.Type,
+            functions :: M.Map A.Ident A.Type }
 
-type ExprTEval a = ReaderT TypeMap (ExceptT String Identity) a
+type ExprTEval a = ReaderT ExprEnv (ExceptT String Identity) a
 
-runExprTEval :: TypeMap -> ExprTEval a -> Either String a
+runExprTEval :: ExprEnv -> ExprTEval a -> Either String a
 runExprTEval env e = runIdentity (runExceptT (runReaderT e env))
 
 -- Zawiera pozycję z którego się wzięło wyrażenie.
 typeOfExpr :: A.Expr -> ExprTEval A.Type
 typeOfExpr (A.EVar pos ident) = do
   env <- ask
-  case M.lookup ident env of
-    Nothing -> throwError $ (undefinedReferenceMessage ident pos) ++ "\n"
+  case M.lookup ident $ variables env of
+    Nothing -> case M.lookup ident $ functions env of
+                Nothing -> throwError $ (undefinedReferenceMessage ident pos) ++ "\n"
+                Just t -> return t
     Just t -> return t
-    
-    
+  
 -- Literals.
 typeOfExpr (A.ELitTrue pos) = return $ A.Bool pos
 typeOfExpr (A.ELitFalse pos) = return $ A.Bool pos
 typeOfExpr (A.ELitInt pos _) = return $ A.Int pos
 typeOfExpr (A.EString pos _) = return $ A.Str pos
+
 -- Binary operator expressions.
 typeOfExpr (A.EAnd pos e1 e2) = typeOfBinOp A.Bool pos e1 e2
 typeOfExpr (A.EOr pos e1 e2) = typeOfBinOp A.Bool pos e1 e2
@@ -57,10 +60,12 @@ typeOfExpr (A.ETuple pos l)
  = do
   listOfTypes <- Prelude.foldr (liftM2 (:)) (pure []) $ typeOfExpr <$> l
   return $ A.Tuple pos listOfTypes
+  
 typeOfExpr (A.ELambda pos (A.Lambda _ arguments retType body))
   -- TODO check if block returns good type!
  = do
   return $ Function pos retType $ getArgType <$> arguments
+  
 typeOfExpr (A.EApp pos callee args) =
   case callee of
     A.LambdaCallee p l -> do
@@ -70,6 +75,7 @@ typeOfExpr (A.EApp pos callee args) =
       t <- typeOfExpr (A.EVar p ident)
       handleFunction t args
 
+-- Checks if function application is performed correctly. If so, returns its return type.
 handleFunction :: A.Type -> [A.Expr] -> ExprTEval A.Type
 handleFunction f args = case f of
     A.Function _ retType params -> (checkArgsCorrectness params args) >>= (\_ -> return retType)
@@ -128,6 +134,7 @@ typesEq (A.Int _) (A.Int _) = True
 typesEq (A.Str _) (A.Str _) = True
 typesEq (A.Bool _) (A.Bool _) = True
 typesEq (A.Void _) (A.Void _) = True
+typesEq (A.NoType _) (A.NoType _) = True
 typesEq (A.Tuple _ types1) (A.Tuple _ types2) =
   and $ Prelude.zipWith typesEq types1 types2
 typesEq (A.Function _ ret1 args1) (A.Function _ ret2 args2) =

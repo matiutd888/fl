@@ -78,6 +78,7 @@ data Type' a
     | Str a
     | Bool a
     | Void a
+    | NoType a
     | Tuple a [Type' a]
     | Function a (Type' a) [ArgType' a]
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
@@ -114,7 +115,7 @@ data MulOp' a = Times a | Div a | Mod a
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 type RelOp = RelOp' BNFC'Position
-data RelOp' a = LTH a | LE a | GTH a | GE a | EQU a | NE a | POW a
+data RelOp' a = LTH a | LE a | GTH a | GE a | EQU a | NE a
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
 newtype Ident = Ident String
@@ -195,6 +196,7 @@ instance HasPosition Type where
     Str p -> p
     Bool p -> p
     Void p -> p
+    NoType p -> p
     Tuple p _ -> p
     Function p _ _ -> p
 
@@ -240,5 +242,4 @@ instance HasPosition RelOp where
     GE p -> p
     EQU p -> p
     NE p -> p
-    POW p -> p
 
