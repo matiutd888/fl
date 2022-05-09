@@ -31,5 +31,5 @@ notAFunctionMessage expr =
 
 errorWrongArgumentPassedByReference :: A.Expr -> ArgType -> String
 errorWrongArgumentPassedByReference expr arg =
-    showPositionOf expr ++ " passing " ++ show expr ++ " as an reference argument "
-    ++ show arg ++ ", expected variable type"
+    showPositionOf expr ++ " passing " ++ printTree expr ++ " as an reference argument "
+    ++ printTree arg ++ ", expected variable type"

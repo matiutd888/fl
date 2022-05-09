@@ -10,7 +10,7 @@ import Control.Monad.State
 import Data.Text
 import qualified Data.Map as M
 import qualified Data.Set as S
-import TypeChecker (assertM, typesEq, ExprEnv (ExprEnv), typeOfExpr, runExprTEval, getArgType)
+import TypeChecker (assertM, typesEq, ExprEnv (ExprEnv), typeOfExpr, runExprTEval, getArgType, isType)
 -- ~ type Stmt = Stmt' BNFC'Position
 -- ~ data Stmt' a
     -- ~ = Empty a DONE
@@ -36,7 +36,7 @@ data Env = Env { variables :: M.Map A.Ident A.Type,
                 levelMap :: M.Map A.Ident Int, 
                 functions :: M.Map A.Ident A.Type, 
                 level :: Int, 
-                functionType :: A.Type }
+                functionType :: A.Type } deriving Show
 
 type StmtTEval a = StateT Env (ExceptT String Identity) a
 
@@ -147,7 +147,8 @@ handleItem t (A.NoInit pos ident) = do
 handleItem t (A.Init pos ident expr) = do
   checkExpressionType t expr
   env <- get
-  put $ env { variables = M.insert ident t (variables env), levelMap = M.insert ident (level env) (levelMap env) }
+  put $ env { variables = M.insert ident t (variables env), 
+              levelMap = M.insert ident (level env) (levelMap env) }
   return ()
   
 checkExpressionType :: A.Type -> A.Expr -> StmtTEval ()
@@ -156,3 +157,40 @@ checkExpressionType t expr = do
   exprType <- liftEither $ runExprTEval (toExprEnv env) (typeOfExpr expr)
   assertM (typesEq exprType t) $ errorMessageWrongType (hasPosition expr) exprType t
   return ()
+
+-- ~ type Program = Program' BNFC'Position
+-- ~ data Program' a = Program a [TopDef' a]
+  -- ~ deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
+
+-- ~ type TopDef = TopDef' BNFC'Position
+-- ~ data TopDef' a = FnDef a (Type' a) Ident [Arg' a] (Block' a)
+  -- ~ deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
+typeProgram :: A.Program -> StmtTEval ()
+typeProgram (A.Program pos functions) = do
+  assertM (Prelude.any checkIfMainDef functions) $ "no main function!"
+  mapM_ handleTopDef functions
+  return ()
+
+handleTopDef :: TopDef -> StmtTEval ()
+handleTopDef (A.FnDef pos retType ident args body) = typeStmt (A.DeclStmt pos (A.FDecl pos retType ident args body))
+
+mainDef = A.Ident "main"
+checkIfMainDef :: A.TopDef -> Bool
+checkIfMainDef (A.FnDef pos retType ident args body) = ident == mainDef
+                                                      && isType retType A.Int
+                                                      && args == []
+
+runStmtTEval :: Env -> StmtTEval a -> Either String (a, Env)
+runStmtTEval env e = runIdentity (runExceptT (runStateT e env))
+
+
+initEnv :: Env
+initEnv = Env { variables = M.empty,
+                levelMap = M.empty,
+                functions = M.empty,
+                level = 0,
+                functionType = A.Void A.BNFC'NoPosition } -- won't be used anyway.
+
+
+runTypeChecker :: A.Program -> Either String ((), Env)
+runTypeChecker p = runStmtTEval initEnv (typeProgram p)

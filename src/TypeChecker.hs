@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module TypeChecker (ExprEnv (ExprEnv), typesEq, assertM, typeOfExpr, ExprTEval, runExprTEval, getArgType) where
+module TypeChecker (ExprEnv (ExprEnv), typesEq, assertM, typeOfExpr, ExprTEval, runExprTEval, getArgType, isType) where
 
 import AbsGramatyka as A
 import Control.Monad.Except
