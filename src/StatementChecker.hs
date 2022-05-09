@@ -14,10 +14,10 @@ import TypeChecker (assertM, typesEq, ExprEnv (ExprEnv), typeOfExpr, runExprTEva
 -- ~ type Stmt = Stmt' BNFC'Position
 -- ~ data Stmt' a
     -- ~ = Empty a DONE
-    -- ~ | BStmt a (Block' a)
+    -- ~ | BStmt a (Block' a) DONE
     -- ~ | DeclStmt a (Decl' a) DONE
-    -- ~ | TupleAss a [TupleIdent' a] (Expr' a)
-    -- ~ | Ass a Ident (Expr' a)
+    -- ~ | TupleAss a [TupleIdent' a] (Expr' a) DONE
+    -- ~ | Ass a Ident (Expr' a) DONE
     -- ~ | Ret a (Expr' a) DONE
     -- ~ | VRet a DONE
     -- ~ | Cond a (Expr' a) (Stmt' a) DONE
@@ -80,14 +80,14 @@ typeStmt (A.DeclStmt _ (A.Decl pos t items)) = do
   return ()
 typeStmt (A.DeclStmt _ (A.FDecl pos retType ident params body)) = do
   env <- get
-  let newvariables = M.insert ident (A.Function pos retType (Prelude.map getArgType params)) (variables env)
+  let newFunctions = M.insert ident (A.Function pos retType (Prelude.map getArgType params)) (functions env)
   let newLevelMap = M.insert ident (level env) (levelMap env)
-  put $ env {variables = newvariables,
+  put $ env {functions = newFunctions,
             levelMap = newLevelMap,
             functionType = retType,
             level = level env + 1}
   typeStmt $ A.BStmt (hasPosition body) body
-  put $ env {variables = newvariables,
+  put $ env {variables = newFunctions,
             levelMap = newLevelMap}
 typeStmt (A.Ret pos expr) = do
   env <- get
@@ -97,9 +97,47 @@ typeStmt (A.VRet pos) = do
   funcT <- liftM functionType get 
   let voidType = A.Void pos
   assertM (typesEq voidType funcT) $ errorMessageWrongType pos voidType funcT
-typeStmt (Ass pos ident expr) = undefined
+typeStmt (A.Ass pos ident expr) = do
+  variables <- liftM variables get
+  case M.lookup ident variables of
+    Nothing -> throwError $ showPosition pos ++ "attempting to assign to an undeclared variable"
+    Just t -> checkExpressionType t expr
+typeStmt (A.TupleAss pos tupleIdents expr) = do
+  env <- get
+  typeOfExpr <- liftEither $ runExprTEval (toExprEnv env) (typeOfExpr expr)
+  case typeOfExpr of
+    A.Tuple p types -> do
+      assertM (Prelude.length types == Prelude.length tupleIdents) $ showPosition pos ++ "error unpacking tuple"
+      zipWithM handleTupleIdent tupleIdents types
+      return ()
+    t -> throwError $ showPosition pos ++ "attempting to unpack tuple with expression that is not a tuple"
+typeStmt (BStmt _ (Block pos stmts)) = do
+  env <- get
+  mapM_ typeStmt stmts
+  put env
+  return ()
   
-  
+-- ~ Tuple a [Type' a]
+
+-- ~ TupleAss a [TupleIdent' a] (Expr' a)
+
+-- ~ type TupleIdent = TupleIdent' BNFC'Position
+-- ~ data TupleIdent' a
+    -- ~ = TupleIdent a Ident | TupleRec a [TupleIdent' a]
+
+handleTupleIdent :: A.TupleIdent -> A.Type -> StmtTEval ()
+handleTupleIdent (TupleIdent pos ident) t = do
+  env <- get
+  put $ env { variables = M.insert ident t (variables env), levelMap = M.insert ident (level env) (levelMap env) }
+handleTupleIdent (TupleRec pos tupleIdents) t = do
+  env <- get
+  case t of
+    A.Tuple p types -> do
+      assertM (Prelude.length types == Prelude.length tupleIdents) $ showPosition pos ++ "error unpacking tuple"
+      zipWithM handleTupleIdent tupleIdents types
+      return ()
+    wrongType -> throwError $ showPosition pos ++ "attempting to unpack tuple with expression that is not a tuple"
+    
 -- TODO check if level is this is second declaration at the same level.
 handleItem :: A.Type -> A.Item -> StmtTEval ()
 handleItem t (A.NoInit pos ident) = do

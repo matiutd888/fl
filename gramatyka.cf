@@ -93,7 +93,7 @@ Bool.      Type ::= "bool" ;
 
 Void.      Type ::= "void" ;
 
-internal NoType. Type ::= "()";
+-- internal NoType. Type ::= "()";
 
 -- internal   Fun. Type ::= Type "(" [Type] ")" ;
 

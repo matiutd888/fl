@@ -134,7 +134,7 @@ typesEq (A.Int _) (A.Int _) = True
 typesEq (A.Str _) (A.Str _) = True
 typesEq (A.Bool _) (A.Bool _) = True
 typesEq (A.Void _) (A.Void _) = True
-typesEq (A.NoType _) (A.NoType _) = True
+-- typesEq (A.NoType _) (A.NoType _) = True
 typesEq (A.Tuple _ types1) (A.Tuple _ types2) =
   and $ Prelude.zipWith typesEq types1 types2
 typesEq (A.Function _ ret1 args1) (A.Function _ ret2 args2) =
