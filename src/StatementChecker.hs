@@ -8,6 +8,7 @@ import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Text
+import qualified Data.Either as DE
 import qualified Data.Map as M
 import qualified Data.Set as S
 import TypeChecker (assertM, typesEq, ExprEnv (ExprEnv), typeOfExpr, runExprTEval, getArgType, isType)
@@ -41,7 +42,11 @@ data Env = Env { variables :: M.Map A.Ident A.Type,
 type StmtTEval a = StateT Env (ExceptT String Identity) a
 
 toExprEnv :: Env -> ExprEnv
-toExprEnv env = ExprEnv (variables env) (functions env)
+toExprEnv env = ExprEnv (variables env) 
+						(levelMap env) 
+						(functions env)
+						(level env)
+						(functionType env) 
 
 
 incrementBlockLevel :: Env -> Env
@@ -82,12 +87,14 @@ typeStmt (A.DeclStmt _ (A.FDecl pos retType ident params body)) = do
   env <- get
   let newFunctions = M.insert ident (A.Function pos retType (Prelude.map getArgType params)) (functions env)
   let newLevelMap = M.insert ident (level env) (levelMap env)
+  let newVariablesMap = Prelude.foldr handleArg (variables env) params
   put $ env {functions = newFunctions,
             levelMap = newLevelMap,
+            variables = newVariablesMap,
             functionType = retType,
             level = level env + 1}
   typeStmt $ A.BStmt (hasPosition body) body
-  put $ env {variables = newFunctions,
+  put $ env {functions = newFunctions,
             levelMap = newLevelMap}
 typeStmt (A.Ret pos expr) = do
   env <- get
@@ -171,12 +178,11 @@ typeProgram (A.Program pos functions) = do
   mapM_ handleTopDef functions
   return ()
 
-handleTopDef :: TopDef -> StmtTEval ()
+handleTopDef :: A.TopDef -> StmtTEval ()
 handleTopDef (A.FnDef pos retType ident args body) = typeStmt (A.DeclStmt pos (A.FDecl pos retType ident args body))
 
-mainDef = A.Ident "main"
 checkIfMainDef :: A.TopDef -> Bool
-checkIfMainDef (A.FnDef pos retType ident args body) = ident == mainDef
+checkIfMainDef (A.FnDef pos retType ident args body) = ident == A.Ident "main"
                                                       && isType retType A.Int
                                                       && args == []
 
@@ -184,8 +190,28 @@ runStmtTEval :: Env -> StmtTEval a -> Either String (a, Env)
 runStmtTEval env e = runIdentity (runExceptT (runStateT e env))
 
 
+noPos :: A.BNFC'Position
+noPos = A.BNFC'NoPosition
+
+printInt :: A.TopDef
+printInt = FnDef noPos (A.Void noPos) (A.Ident "printInt") [A.Arg noPos (A.ArgT noPos (A.Int noPos)) (A.Ident "x")] (A.Block noPos [])
+
+printBool :: A.TopDef
+printBool = FnDef noPos (A.Void noPos) (A.Ident "printBool") [A.Arg noPos (A.ArgT noPos (A.Bool noPos)) (A.Ident "x")] (A.Block noPos [])
+
+printString :: A.TopDef
+printString = FnDef noPos (A.Void noPos) (A.Ident "printString") [A.Arg noPos (A.ArgT noPos (A.Str noPos)) (A.Ident "x")] (A.Block noPos [])
+
+addPrintFunctions :: Env -> Env
+addPrintFunctions e = snd $ DE.fromRight ((), initEnv) $ runStmtTEval e x
+	where x = do
+		handleTopDef printInt
+		handleTopDef printBool
+		handleTopDef printString
+
+
 initEnv :: Env
-initEnv = Env { variables = M.empty,
+initEnv = addPrintFunctions $ Env { variables = M.empty,
                 levelMap = M.empty,
                 functions = M.empty,
                 level = 0,
@@ -194,3 +220,8 @@ initEnv = Env { variables = M.empty,
 
 runTypeChecker :: A.Program -> Either String ((), Env)
 runTypeChecker p = runStmtTEval initEnv (typeProgram p)
+
+handleArg :: Arg -> M.Map Ident Type -> M.Map Ident Type
+handleArg (Arg _ (ArgT _ t) ident) map = M.insert ident t map
+handleArg (Arg _ (ArgRef _ t) ident) map = M.insert ident t map
+

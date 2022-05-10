@@ -21,21 +21,18 @@ int main () {
 
     // Funckja toString jest zdefiniowana dla każdego z trzech podstawowych typów
     // true
-    print(toString(t));
+    printBool(t);
 
     // 10
-    print(toString(x));
+    printInt(x);
 
     // toString(s: string) = s
     // foo
-    print(s);
+    printString(s);
 
     // Zmienne, operacja przypisania
     t = false;
-    print(toString(t));
-
-    // Konkatenacja stringów
-    print("foo " + "bar");
+    printBool(t);
 
     int f(int ref p) {
         p = p + 1;
@@ -44,9 +41,9 @@ int main () {
 
     int x = 4;
     // Wyświetli 10. (5 + 5)
-    print(toString(f(x) + x));
+    printInt(f(x) + x);
 
     int y = 4;
     // Wyświetli 9. (4 + 5)
-    print(toString(y + f(y)));
+    printInt(y + f(y));
 }

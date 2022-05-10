@@ -7,15 +7,18 @@ import Control.Monad.Except
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
-
+import PrintGramatyka
 import Errors
 
 import qualified Data.Map as M
 import Data.Text
 
 
-data ExprEnv = ExprEnv { variables :: M.Map A.Ident A.Type,
-            functions :: M.Map A.Ident A.Type }
+data ExprEnv = ExprEnv { variables :: M.Map A.Ident A.Type, 
+                levelMap :: M.Map A.Ident Int, 
+                functions :: M.Map A.Ident A.Type, 
+                level :: Int, 
+                functionType :: A.Type } deriving Show
 
 type ExprTEval a = ReaderT ExprEnv (ExceptT String Identity) a
 
@@ -39,11 +42,11 @@ typeOfExpr (A.ELitInt pos _) = return $ A.Int pos
 typeOfExpr (A.EString pos _) = return $ A.Str pos
 
 -- Binary operator expressions.
-typeOfExpr (A.EAnd pos e1 e2) = typeOfBinOp A.Bool pos e1 e2
-typeOfExpr (A.EOr pos e1 e2) = typeOfBinOp A.Bool pos e1 e2
-typeOfExpr (A.EAdd pos e1 _ e2) = typeOfBinOp A.Int pos e1 e2
-typeOfExpr (A.EMul pos e1 _ e2) = typeOfBinOp A.Int pos e1 e2
-typeOfExpr (A.ERel pos e1 _ e2) = typeOfBinOp A.Bool pos e1 e2
+typeOfExpr (A.EAnd pos e1 e2) = typeOfBinOp A.Bool A.Bool pos e1 e2
+typeOfExpr (A.EOr pos e1 e2) = typeOfBinOp A.Bool A.Bool pos e1 e2
+typeOfExpr (A.EAdd pos e1 _ e2) = typeOfBinOp A.Int A.Int pos e1 e2
+typeOfExpr (A.EMul pos e1 _ e2) = typeOfBinOp A.Int A.Int pos e1 e2
+typeOfExpr (A.ERel pos e1 _ e2) = typeOfBinOp A.Int A.Bool pos e1 e2
 
 -- Unary operator expressions.
 typeOfExpr (A.Not pos e) = do
@@ -70,16 +73,26 @@ typeOfExpr (A.EApp pos callee args) =
   case callee of
     A.LambdaCallee p l -> do
       t <- typeOfExpr (A.ELambda p l)
-      handleFunction t args
+      handleFunction pos t args
     A.IdentCallee p ident -> do
       t <- typeOfExpr (A.EVar p ident)
-      handleFunction t args
+      -- Evar
+      -- 1. Will check if there exists variable of given iden, if so it returs its type.
+      -- 2. If not, checks if there exists function of given iden, if so, it returns its type.
+      -- What is left to handle is the case when both function and variable of given iden exist and 
+      -- variable was not of a suitable type.
+      catchError (handleFunction pos t args) (\_ -> do 
+          env <- ask
+          case M.lookup ident (functions env) of
+            Just t -> handleFunction pos t args
+            Nothing -> throwError $ showPosition pos ++ "no function " ++ printTree ident ++ " found")
+        
 
 -- Checks if function application is performed correctly. If so, returns its return type.
-handleFunction :: A.Type -> [A.Expr] -> ExprTEval A.Type
-handleFunction f args = case f of
+handleFunction :: BNFC'Position -> A.Type -> [A.Expr] -> ExprTEval A.Type
+handleFunction pos f args = case f of
     A.Function _ retType params -> (checkArgsCorrectness params args) >>= (\_ -> return retType)
-    _ -> throwError $ notAFunctionMessage f
+    _ -> throwError $ notAFunctionMessage pos f
 
 checkArgsCorrectness :: [A.ArgType] -> [A.Expr] -> ExprTEval ()
 checkArgsCorrectness params args = do 
@@ -114,14 +127,15 @@ getTypeFromArgType (A.ArgT _ t) = t
 
 typeOfBinOp ::
   (BNFC'Position -> A.Type)
+  -> (BNFC'Position -> A.Type)
   -> A.BNFC'Position
   -> A.Expr
   -> A.Expr
   -> ExprTEval A.Type
-typeOfBinOp typeConstructor pos e1 e2 = do
+typeOfBinOp typeConstructor retTypeConstructor pos e1 e2 = do
   typeOfExpr e1 >>= checkForType typeConstructor (hasPosition e1)
   typeOfExpr e2 >>= checkForType typeConstructor (hasPosition e2)
-  return $ typeConstructor pos
+  return $ retTypeConstructor pos
 
 checkForType :: MonadError String m => (BNFC'Position -> A.Type) -> BNFC'Position -> A.Type -> m ()
 checkForType typeConstructor pos t = assertM (isType t typeConstructor) (errorMessageWrongType pos t $ typeConstructor pos)

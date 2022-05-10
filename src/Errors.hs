@@ -24,9 +24,9 @@ undefinedReferenceMessage :: A.Ident -> BNFC'Position -> String
 undefinedReferenceMessage (Ident x) pos =
   showPosition pos ++ "undefined reference " ++ show x
 
-notAFunctionMessage :: A.Type -> String
-notAFunctionMessage expr =
-  showPositionOf expr ++
+notAFunctionMessage :: BNFC'Position -> A.Type -> String
+notAFunctionMessage pos expr =
+  showPosition pos ++
   " applying argument to expression that is not a function!"
 
 errorWrongArgumentPassedByReference :: A.Expr -> ArgType -> String
