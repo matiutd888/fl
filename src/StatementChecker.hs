@@ -2,6 +2,7 @@
 module StatementChecker where
 
 import AbsGramatyka as A
+import PrintGramatyka (printTree)
 import Errors
 import Control.Monad.Except
 import Control.Monad.Identity
@@ -30,23 +31,24 @@ import TypeChecker (assertM, typesEq, ExprEnv (ExprEnv), typeOfExpr, runExprTEva
 -- Poziom bloku (liczymy od zera).
 
 -- Variables (zawiera zmienne do których mogę przypisać).
--- Functions (zawiera deklaracje funkcji, do nich nie mogę przypisać).
+-- Functions (holds function declarations, you can't assign to such functions. This map doesn't have info about
+--  functions that are lambdas, variables or are function parameters).
 -- Levels (zawiera informację o tym, na którym poziomie zadeklarowana została dana zmienna / funkcja).
--- Jak na razie nie rozpatruję przypadku w której zmienne się pokrywają nazwą.
 data Env = Env { variables :: M.Map A.Ident A.Type, 
-                levelMap :: M.Map A.Ident Int, 
-                functions :: M.Map A.Ident A.Type, 
-                level :: Int, 
+                variableLevels :: M.Map A.Ident Int, 
+                functions :: M.Map A.Ident A.Type,  
+                functionLevels :: M.Map A.Ident Int,
+                level :: Int,
                 functionType :: A.Type } deriving Show
 
 type StmtTEval a = StateT Env (ExceptT String Identity) a
 
 toExprEnv :: Env -> ExprEnv
 toExprEnv env = ExprEnv (variables env) 
-						(levelMap env) 
+						(variableLevels env) 
 						(functions env)
 						(level env)
-						(functionType env) 
+						(functionType env)
 
 
 incrementBlockLevel :: Env -> Env
@@ -86,16 +88,17 @@ typeStmt (A.DeclStmt _ (A.Decl pos t items)) = do
 typeStmt (A.DeclStmt _ (A.FDecl pos retType ident params body)) = do
   env <- get
   let newFunctions = M.insert ident (A.Function pos retType (Prelude.map getArgType params)) (functions env)
-  let newLevelMap = M.insert ident (level env) (levelMap env)
-  let newVariablesMap = Prelude.foldr handleArg (variables env) params
+  let newFunctionLevels = M.insert ident (level env) (functionLevels env)
+  let envWithAddedParams = Prelude.foldr (handleArg (level env + 1)) env params
   put $ env {functions = newFunctions,
-            levelMap = newLevelMap,
-            variables = newVariablesMap,
+            variableLevels = variableLevels envWithAddedParams,
+            variables = variables envWithAddedParams,
+            functionLevels = newFunctionLevels,
             functionType = retType,
             level = level env + 1}
   typeStmt $ A.BStmt (hasPosition body) body
   put $ env {functions = newFunctions,
-            levelMap = newLevelMap}
+            functionLevels = newFunctionLevels}
 typeStmt (A.Ret pos expr) = do
   env <- get
   checkExpressionType (functionType env) expr
@@ -133,10 +136,10 @@ typeStmt (BStmt _ (Block pos stmts)) = do
     -- ~ = TupleIdent a Ident | TupleRec a [TupleIdent' a]
 
 handleTupleIdent :: A.TupleIdent -> A.Type -> StmtTEval ()
-handleTupleIdent (TupleIdent pos ident) t = do
+handleTupleIdent (A.TupleIdent pos ident) t = do
   env <- get
-  put $ env { variables = M.insert ident t (variables env), levelMap = M.insert ident (level env) (levelMap env) }
-handleTupleIdent (TupleRec pos tupleIdents) t = do
+  put $ env { variables = M.insert ident t (variables env), variableLevels = M.insert ident (level env) (variableLevels env) }
+handleTupleIdent (A.TupleRec pos tupleIdents) t = do
   env <- get
   case t of
     A.Tuple p types -> do
@@ -144,18 +147,39 @@ handleTupleIdent (TupleRec pos tupleIdents) t = do
       zipWithM handleTupleIdent tupleIdents types
       return ()
     wrongType -> throwError $ showPosition pos ++ "attempting to unpack tuple with expression that is not a tuple"
-    
+  
+-- Check if variable ident can be declared at the given level.
+checkVariableLevel :: BNFC'Position -> Ident -> StmtTEval ()
+checkVariableLevel pos ident = do
+  env <- get
+  let lvl = level env
+  case M.lookup ident (variableLevels env) of
+    Nothing -> return ()
+    Just varLevel -> assertM (varLevel /= lvl) $ showPosition pos ++ "variable " ++ printTree ident ++ "was already declared at this level"
+  
+checkFunctionLevel :: BNFC'Position -> Ident -> StmtTEval ()
+checkFunctionLevel pos ident = do
+  env <- get
+  let lvl = level env
+  case M.lookup ident (functionLevels env) of
+    Nothing -> return ()
+    Just varLevel -> assertM (varLevel /= lvl) $ showPosition pos ++ "function " ++ printTree ident ++ "was already declared at this level"
+  
+
 -- TODO check if level is this is second declaration at the same level.
 handleItem :: A.Type -> A.Item -> StmtTEval ()
 handleItem t (A.NoInit pos ident) = do
   env <- get
-  put $ env { variables = M.insert ident t (variables env), levelMap = M.insert ident (level env) (levelMap env) }
+  checkVariableLevel pos ident
+  put $ env { variables = M.insert ident t (variables env), 
+              variableLevels = M.insert ident (level env) (variableLevels env) }
   return ()
 handleItem t (A.Init pos ident expr) = do
   checkExpressionType t expr
+  checkVariableLevel pos ident
   env <- get
   put $ env { variables = M.insert ident t (variables env), 
-              levelMap = M.insert ident (level env) (levelMap env) }
+              variableLevels = M.insert ident (level env) (variableLevels env) }
   return ()
   
 checkExpressionType :: A.Type -> A.Expr -> StmtTEval ()
@@ -212,8 +236,9 @@ addPrintFunctions e = snd $ DE.fromRight ((), initEnv) $ runStmtTEval e x
 
 initEnv :: Env
 initEnv = addPrintFunctions $ Env { variables = M.empty,
-                levelMap = M.empty,
+                variableLevels = M.empty,
                 functions = M.empty,
+                functionLevels = M.empty,
                 level = 0,
                 functionType = A.Void A.BNFC'NoPosition } -- won't be used anyway.
 
@@ -221,7 +246,10 @@ initEnv = addPrintFunctions $ Env { variables = M.empty,
 runTypeChecker :: A.Program -> Either String ((), Env)
 runTypeChecker p = runStmtTEval initEnv (typeProgram p)
 
-handleArg :: Arg -> M.Map Ident Type -> M.Map Ident Type
-handleArg (Arg _ (ArgT _ t) ident) map = M.insert ident t map
-handleArg (Arg _ (ArgRef _ t) ident) map = M.insert ident t map
+-- ads arg to variables map and levels map
+handleArg :: Int -> Arg -> Env -> Env
+handleArg newLevel (Arg _ (ArgT _ t) ident) env = env { variables = M.insert ident t (variables env),
+                                               variableLevels = M.insert ident newLevel(variableLevels env) }
+handleArg newLevel (Arg _ (ArgRef _ t) ident) env = env { variables = M.insert ident t (variables env),
+                                               variableLevels = M.insert ident newLevel (variableLevels env) }
 

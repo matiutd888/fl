@@ -39,7 +39,7 @@ int main () {
         return p;
     };
 
-    int x = 4;
+    x = 4;
     // Wyświetli 10. (5 + 5)
     printInt(f(x) + x);
 
