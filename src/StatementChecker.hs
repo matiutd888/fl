@@ -1,4 +1,3 @@
--- TODO 
 module StatementChecker where
 
 import AbsGramatyka as A
@@ -34,6 +33,7 @@ import TypeChecker (assertM, typesEq, ExprEnv (ExprEnv), typeOfExpr, runExprTEva
 -- Functions (holds function declarations, you can't assign to such functions. This map doesn't have info about
 --  functions that are lambdas, variables or are function parameters).
 -- Levels (zawiera informację o tym, na którym poziomie zadeklarowana została dana zmienna / funkcja).
+-- TODO check if function returns (I need to add an other element to env).
 data Env = Env { variables :: M.Map A.Ident A.Type, 
                 variableLevels :: M.Map A.Ident Int, 
                 functions :: M.Map A.Ident A.Type,  
@@ -123,6 +123,7 @@ typeStmt (A.TupleAss pos tupleIdents expr) = do
     t -> throwError $ showPosition pos ++ "attempting to unpack tuple with expression that is not a tuple"
 typeStmt (BStmt _ (Block pos stmts)) = do
   env <- get
+  put env {level = level env + 1}
   mapM_ typeStmt stmts
   put env
   return ()
@@ -155,7 +156,7 @@ checkVariableLevel pos ident = do
   let lvl = level env
   case M.lookup ident (variableLevels env) of
     Nothing -> return ()
-    Just varLevel -> assertM (varLevel /= lvl) $ showPosition pos ++ "variable " ++ printTree ident ++ "was already declared at this level"
+    Just varLevel -> assertM (varLevel /= lvl) $ showPosition pos ++ "variable " ++ printTree ident ++ " was already declared at this level"
   
 checkFunctionLevel :: BNFC'Position -> Ident -> StmtTEval ()
 checkFunctionLevel pos ident = do
@@ -163,10 +164,8 @@ checkFunctionLevel pos ident = do
   let lvl = level env
   case M.lookup ident (functionLevels env) of
     Nothing -> return ()
-    Just varLevel -> assertM (varLevel /= lvl) $ showPosition pos ++ "function " ++ printTree ident ++ "was already declared at this level"
+    Just varLevel -> assertM (varLevel /= lvl) $ showPosition pos ++ "function " ++ printTree ident ++ " was already declared at this level"
   
-
--- TODO check if level is this is second declaration at the same level.
 handleItem :: A.Type -> A.Item -> StmtTEval ()
 handleItem t (A.NoInit pos ident) = do
   env <- get
