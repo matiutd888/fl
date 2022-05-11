@@ -12,22 +12,6 @@ import qualified Data.Either as DE
 import qualified Data.Map as M
 import qualified Data.Set as S
 import TypeChecker (assertM, typesEq, ExprEnv (ExprEnv), typeOfExpr, runExprTEval, getArgType, isType)
--- ~ type Stmt = Stmt' BNFC'Position
--- ~ data Stmt' a
-    -- ~ = Empty a DONE
-    -- ~ | BStmt a (Block' a) DONE
-    -- ~ | DeclStmt a (Decl' a) DONE
-    -- ~ | TupleAss a [TupleIdent' a] (Expr' a) DONE
-    -- ~ | Ass a Ident (Expr' a) DONE
-    -- ~ | Ret a (Expr' a) DONE
-    -- ~ | VRet a DONE
-    -- ~ | Cond a (Expr' a) (Stmt' a) DONE
-    -- ~ | CondElse a (Expr' a) (Stmt' a) (Stmt' a) DONE
-    -- ~ | While a (Expr' a) (Stmt' a) DONE
-    -- ~ | SExp a (Expr' a) DONE
-  -- ~ deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
-
--- Poziom bloku (liczymy od zera).
 
 -- Variables (zawiera zmienne do których mogę przypisać).
 -- Functions (holds function declarations, you can't assign to such functions. This map doesn't have info about
@@ -94,8 +78,7 @@ typeStmt (A.DeclStmt _ (A.FDecl pos retType ident params body)) = do
             variableLevels = variableLevels envWithAddedParams,
             variables = variables envWithAddedParams,
             functionLevels = newFunctionLevels,
-            functionType = retType,
-            level = level env + 1}
+            functionType = retType}
   typeStmt $ A.BStmt (hasPosition body) body
   put $ env {functions = newFunctions,
             functionLevels = newFunctionLevels}
@@ -138,8 +121,13 @@ typeStmt (BStmt _ (Block pos stmts)) = do
 
 handleTupleIdent :: A.TupleIdent -> A.Type -> StmtTEval ()
 handleTupleIdent (A.TupleIdent pos ident) t = do
-  env <- get
-  put $ env { variables = M.insert ident t (variables env), variableLevels = M.insert ident (level env) (variableLevels env) }
+  -- Same code as during assignment, only don't check the type of expression 
+  -- (as we know the type from typing the tuple).
+  variables <- liftM variables get
+  case M.lookup ident variables of
+    Nothing -> throwError $ showPosition pos ++ "attempting to assign to an undeclared variable"
+    Just varType -> assertM (typesEq varType t) $ showPosition pos ++ "attempting to assign expression of type " 
+												++ printTree t ++ " to a variable of type " ++ printTree varType
 handleTupleIdent (A.TupleRec pos tupleIdents) t = do
   env <- get
   case t of
