@@ -23,14 +23,18 @@ function<void(int)> g(int ref x) {
 	};
 }
 
-void main() {
+void assert(bool b) {
+    return;
+}
+
+int main() {
     function<int()> f = counter(lambda: () -> int {
         return 12;
     } );
 
-    print(toString(f())); // 12
-    print(toString(f())); // 13
-    print(toString(f())); // 14
+    printInt(f()); // 12
+    printInt(f()); // 13
+    printInt(f()); // 14
 
     function<void(int ref)> p = adder(10);
     int x = 0;
