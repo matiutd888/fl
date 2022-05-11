@@ -5,7 +5,8 @@ import PrintGramatyka
 
 errorMessageWrongType :: BNFC'Position -> A.Type -> A.Type -> String
 errorMessageWrongType pos received expected =
-  showPosition pos ++ unexpectedTypeMessage received ++ ", " ++ (expectedTypeMessage expected)
+  showPosition pos ++
+  unexpectedTypeMessage received ++ ", " ++ (expectedTypeMessage expected)
 
 showPositionOf :: A.HasPosition a => a -> String
 showPositionOf = showPosition . A.hasPosition
@@ -26,10 +27,11 @@ undefinedReferenceMessage (Ident x) pos =
 
 notAFunctionMessage :: BNFC'Position -> A.Type -> String
 notAFunctionMessage pos expr =
-  showPosition pos ++
-  " applying argument to expression that is not a function!"
+  showPosition pos ++ " applying argument to expression that is not a function!"
 
 errorWrongArgumentPassedByReference :: A.Expr -> ArgType -> String
 errorWrongArgumentPassedByReference expr arg =
-    showPositionOf expr ++ " passing " ++ printTree expr ++ " as an reference argument "
-    ++ printTree arg ++ ", expected variable type"
+  showPositionOf expr ++
+  " passing " ++
+  printTree expr ++
+  " as an reference argument " ++ printTree arg ++ ", expected variable type"

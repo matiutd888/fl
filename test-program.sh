@@ -4,4 +4,5 @@ cd ../src/
 ghc -o main Main.hs
 rm -rf *.o *.hi
 ./main
+rm -rf main
 
