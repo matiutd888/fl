@@ -21,11 +21,10 @@ import TypeChecker
   , typesEq
   )
 
--- Variables (zawiera zmienne do których mogę przypisać).
+-- Variables (holds variables of any type).
 -- Functions (holds function declarations, you can't assign to such functions. This map doesn't have info about
 --  functions that are lambdas, variables or are function parameters).
--- Levels (zawiera informację o tym, na którym poziomie zadeklarowana została dana zmienna / funkcja).
--- TODO check if function returns (I need to add an other element to env).
+-- Levels (holds info about level on which function or variable was declared - useful to check whether there are two declarations on the same block).
 data Env =
   Env
     { variables :: M.Map A.Ident A.Type
@@ -134,12 +133,7 @@ typeStmt (BStmt _ (Block pos stmts)) = do
   mapM_ typeStmt stmts
   put env
   return ()
-    -- ~ = TupleIdent a Ident | TupleRec a [TupleIdent' a]
 
--- ~ Tuple a [Type' a]
--- ~ TupleAss a [TupleIdent' a] (Expr' a)
--- ~ type TupleIdent = TupleIdent' BNFC'Position
--- ~ data TupleIdent' a
 handleTupleIdent :: A.TupleIdent -> A.Type -> StmtTEval ()
 handleTupleIdent (A.TupleIdent pos ident) t
   -- Same code as during assignment, only don't check the type of expression 
@@ -296,7 +290,7 @@ initEnv =
 runTypeChecker :: A.Program -> Either String ((), Env)
 runTypeChecker p = runStmtTEval initEnv (typeProgram p)
 
--- ads arg to variables map and levels map
+-- Adds arg to variables map and levels map.
 handleArg :: Int -> Arg -> Env -> Env
 handleArg newLevel (Arg _ (ArgT _ t) ident) env =
   env
