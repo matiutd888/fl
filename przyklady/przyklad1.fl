@@ -1,0 +1,16 @@
+int main() {
+    int f() {
+        return f();
+    };
+
+    int g(int x) {
+        { int x; }
+        int y = g(10);
+        void g() {
+            return;
+        };
+    };
+    int x = 0;
+    { string x; }
+}
+

@@ -229,7 +229,6 @@ instance Print (AbsGramatyka.Type' a) where
     AbsGramatyka.Str _ -> prPrec i 0 (concatD [doc (showString "string")])
     AbsGramatyka.Bool _ -> prPrec i 0 (concatD [doc (showString "bool")])
     AbsGramatyka.Void _ -> prPrec i 0 (concatD [doc (showString "void")])
-    AbsGramatyka.NoType _ -> prPrec i 0 (concatD [doc (showString "()")])
     AbsGramatyka.Tuple _ types -> prPrec i 0 (concatD [doc (showString "tuple"), doc (showString "<"), prt 0 types, doc (showString ">")])
     AbsGramatyka.Function _ type_ argtypes -> prPrec i 0 (concatD [doc (showString "function"), doc (showString "<"), prt 0 type_, doc (showString "("), prt 0 argtypes, doc (showString ")"), doc (showString ">")])
 

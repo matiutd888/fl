@@ -2,7 +2,7 @@ int increment(int ref n) {
     n = n + 1;
 }
 
-void main() {
+int main() {
     int x = 10;
-    print(toString(passByReference(x)));
+    printInt(increment(x));
 }

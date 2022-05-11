@@ -1,11 +1,11 @@
-void main() {
+int main() {
     tuple<string, bool, int> z = ["a", true, 12];
     
     tuple<int> t = [12];
     bool b;
     string s;
     int i;
-    <s, b, i> = z;
+    { int s = 10; <s, b, i> = z; }
     <s, b, i> = ["inne", false, 13];
 
     // Zagnieżdzenie

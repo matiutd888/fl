@@ -1,19 +1,20 @@
-void main() {
-    n = 12;
+int main() {
+    int n = 12;
 
     // Program obliczający silnię
     int it = 1;
     while(it <= n) {
         it = it * it;
     }
-    print("Factorial = " + toString(it));
+    printString("Factorial = ");
+    printInt(it);
 
     // Program sprawdzający czy liczba jest parzysta
     if (n % 2 == 0) {
-        print("Liczba parzysta");
+        printString("Liczba parzysta");
     }
     else {
-        print("Liczba nieparzysta");
+        printString("Liczba nieparzysta");
     }
 
 }

@@ -1,3 +1,7 @@
+void assert(bool b) {
+    return;
+}
+
 int f() {
     int x = 0;
     {   
@@ -30,7 +34,7 @@ void h() {
     }
 }
 
-void main() {
+int main() {
     {
         int x = 0;
 

@@ -5,6 +5,6 @@ int factorial(int n) {
     return factorial(n - 1) * n;
 }
 
-void main() {
-    print(toString(10));
+int main() {
+    printInt(10);
 }

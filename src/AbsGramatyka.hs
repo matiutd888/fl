@@ -78,7 +78,6 @@ data Type' a
     | Str a
     | Bool a
     | Void a
-    | NoType a
     | Tuple a [Type' a]
     | Function a (Type' a) [ArgType' a]
   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
@@ -196,7 +195,6 @@ instance HasPosition Type where
     Str p -> p
     Bool p -> p
     Void p -> p
-    NoType p -> p
     Tuple p _ -> p
     Function p _ _ -> p
 
