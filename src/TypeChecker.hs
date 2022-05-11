@@ -129,12 +129,6 @@ checkArgCorrectness arg param =
         (typesEq argType paramType)
         (errorMessageWrongType (hasPosition arg) argType paramType)
 
-assertM :: MonadError String m => Bool -> String -> m ()
-assertM b s =
-  if b
-    then return ()
-    else throwError s
-
 getArgType :: A.Arg -> A.ArgType
 getArgType (A.Arg _ t _) = t
 

@@ -1,7 +1,16 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Errors where
 
 import AbsGramatyka as A
+import Control.Monad.Except
 import PrintGramatyka
+
+assertM :: MonadError String m => Bool -> String -> m ()
+assertM b s =
+  if b
+    then return ()
+    else throwError s
 
 errorMessageWrongType :: BNFC'Position -> A.Type -> A.Type -> String
 errorMessageWrongType pos received expected =
