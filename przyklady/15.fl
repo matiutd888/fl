@@ -5,7 +5,7 @@ int main() {
     bool b;
     string s;
     int i;
-    { int s = 10; <s, b, i> = z; }
+    { <s, b, i> = z; }
     <s, b, i> = ["inne", false, 13];
 
     // Zagnieżdzenie
