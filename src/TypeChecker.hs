@@ -42,10 +42,7 @@ typeOfExpr :: A.Expr -> ExprTEval A.Type
 typeOfExpr (A.EVar pos ident) = do
   env <- ask
   case M.lookup ident $ variables env of
-    Nothing ->
-      case M.lookup ident $ functions env of
-        Nothing -> throwError $ (undefinedReferenceMessage ident pos) ++ "\n"
-        Just t -> return t
+    Nothing -> throwError $ (undefinedReferenceMessage ident pos) ++ "\n"
     Just t -> return t
 -- Literals.
 typeOfExpr (A.ELitTrue pos) = return $ A.Bool pos
@@ -81,10 +78,14 @@ typeOfExpr (A.EApp pos callee args) =
       t <- typeOfExpr (A.ELambda p l)
       handleFunction pos t args
     A.IdentCallee p ident -> do
-      t <- typeOfExpr (A.EVar p ident)
-      -- Evar
-      -- 1. Will check if there exists variable of given iden, if so it returs its type.
-      -- 2. If not, checks if there exists function of given iden, if so, it returns its type.
+      -- Evar only checks variables.
+      -- That's why if it throws error we should catch it and check functions in environment.
+      t <- catchError (typeOfExpr (A.EVar p ident)) (\_ -> do
+        env <- ask
+        case M.lookup ident (functions env) of
+          Just t -> return t
+          Nothing -> throwError $ showPosition pos ++ "no function " ++ printTree ident ++ " found")
+
       -- What is left to handle is the case when both function and variable of given iden exist and 
       -- variable was not of a suitable type.
       catchError
