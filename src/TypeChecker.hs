@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE BlockArguments #-}
 
 module TypeChecker
   ( ExprEnv(ExprEnv)
@@ -42,7 +43,10 @@ typeOfExpr :: A.Expr -> ExprTEval A.Type
 typeOfExpr (A.EVar pos ident) = do
   env <- ask
   case M.lookup ident $ variables env of
-    Nothing -> throwError $ (undefinedReferenceMessage ident pos) ++ "\n"
+    Nothing ->
+      case M.lookup ident $ functions env of
+        Nothing -> throwError $ (undefinedReferenceMessage ident pos) ++ "\n"
+        Just t -> return t
     Just t -> return t
 -- Literals.
 typeOfExpr (A.ELitTrue pos) = return $ A.Bool pos
@@ -78,25 +82,23 @@ typeOfExpr (A.EApp pos callee args) =
       t <- typeOfExpr (A.ELambda p l)
       handleFunction pos t args
     A.IdentCallee p ident -> do
-      -- Evar only checks variables.
-      -- That's why if it throws error we should catch it and check functions in environment.
-      t <- catchError (typeOfExpr (A.EVar p ident)) (\_ -> do
-        env <- ask
-        case M.lookup ident (functions env) of
-          Just t -> return t
-          Nothing -> throwError $ showPosition pos ++ "no function " ++ printTree ident ++ " found")
-
+      t <- typeOfExpr (A.EVar p ident)
+      -- Evar
+      -- 1. Will check if there exists variable of given iden, if so it returs its type.
+      -- 2. If not, checks if there exists function of given iden, if so, it returns its type.
       -- What is left to handle is the case when both function and variable of given iden exist and 
       -- variable was not of a suitable type.
-      catchError
-        (handleFunction pos t args)
-        (\_ -> do
-           env <- ask
-           case M.lookup ident (functions env) of
-             Just t -> handleFunction pos t args
-             Nothing ->
-               throwError $
-               showPosition pos ++ "no function " ++ printTree ident ++ " found")
+      -- Maybe right now I should not do it.
+      handleFunction pos t args
+      -- ~ catchError
+        -- ~ (handleFunction pos t args)
+        -- ~ (\_ -> do
+           -- ~ env <- ask
+           -- ~ case M.lookup ident (functions env) of
+             -- ~ Just t -> handleFunction pos t args
+             -- ~ Nothing ->
+               -- ~ throwError $
+               -- ~ showPosition pos ++ "no function " ++ printTree ident ++ " found")
 
 -- Checks if function application is performed correctly. If so, returns its return type.
 handleFunction :: BNFC'Position -> A.Type -> [A.Expr] -> ExprTEval A.Type
@@ -117,7 +119,13 @@ checkArgCorrectness arg param =
     A.ArgRef pos ttype ->
       case arg of
         A.EVar _ ident -> do
-          varType <- typeOfExpr arg
+          -- We evaluate varType by hand because we don't want functions environment to be checked.
+          varType <-
+            do env <- ask
+               case M.lookup ident (variables env) of
+                 Just t -> return t
+                 Nothing ->
+                   throwError $ errorWrongArgumentPassedByReference arg param
           let paramType = (getTypeFromArgType param)
           assertM
             (typesEq varType paramType)
