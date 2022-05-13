@@ -118,8 +118,9 @@ checkArgCorrectness arg param =
   case param of
     A.ArgRef pos ttype ->
       case arg of
-        A.EVar _ ident -> do
+        A.EVar _ ident
           -- We evaluate varType by hand because we don't want functions environment to be checked.
+         -> do
           varType <-
             do env <- ask
                case M.lookup ident (variables env) of

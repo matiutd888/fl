@@ -114,7 +114,6 @@ fromFunction pos d =
   typeCheckerError ++
   showPosition pos ++ "expected data of type function, received " ++ show d
 
-
 evalExpr :: A.Expr -> EvalT Data
 evalExpr (A.ELitTrue _) = return $ Bool True
 evalExpr (A.ELitFalse _) = return $ Bool False
@@ -172,7 +171,8 @@ evalExpr (A.EVar pos ident) = do
   case M.lookup ident $ variables env of
     Nothing -> do
       case M.lookup ident $ functions env of
-        Nothing -> throwError $ typeCheckerError ++ (undefinedReferenceMessage ident pos)
+        Nothing ->
+          throwError $ typeCheckerError ++ (undefinedReferenceMessage ident pos)
         Just f -> return $ Function f
     Just l -> return $ DM.fromJust (M.lookup l $ memory s)
 evalExpr (A.ETuple pos expressions) = do
@@ -180,10 +180,14 @@ evalExpr (A.ETuple pos expressions) = do
   return $ Tuple values
 evalExpr (A.ELambda pos (A.Lambda _ args rT block)) = do
   e <- ask
-  return $ Function $ FunctionData { env = e, 
-                                     stmt = A.BStmt (A.hasPosition block) block, 
-                                     retType = rT,
-                                     arguments = args }
+  return $
+    Function $
+    FunctionData
+      { env = e
+      , stmt = A.BStmt (A.hasPosition block) block
+      , retType = rT
+      , arguments = args
+      }
 evalExpr (A.EApp pos (A.LambdaCallee p l) exprs) = do
   function <- evalExpr (A.ELambda p l) >>= fromFunction p
   handleFunction function exprs
@@ -191,22 +195,22 @@ evalExpr (A.EApp pos (A.IdentCallee p ident) exprs) = do
   function <- evalExpr (A.EVar p ident) >>= fromFunction p
   handleFunction function exprs
 
-  
 evalWithLoc :: A.Expr -> EvalT Loc
 evalWithLoc e@(A.EVar pos ident) = do
   env <- ask
   case M.lookup ident (variables env) of
     Just l -> return l
-    Nothing -> throwError $ typeCheckerError ++ showPosition pos ++ "evar variable not found"
-evalWithLoc e = throwError $ typeCheckerError ++ showPositionOf e ++ "not a variable"    
+    Nothing ->
+      throwError $
+      typeCheckerError ++ showPosition pos ++ "evar variable not found"
+evalWithLoc e =
+  throwError $ typeCheckerError ++ showPositionOf e ++ "not a variable"
 
-
-handleFunction :: FunctionData -> [A.Expr] -> handle    
+handleFunction :: FunctionData -> [A.Expr] -> handle
 handleFunction = undefined
 
 -- ~ type Lambda = Lambda' BNFC'Position
 -- ~ data Lambda' a = Lambda a [Arg' a] (Type' a) (Block' a)
-
 operation :: A.RelOp -> (Integer -> Integer -> Bool)
 operation (A.LTH _) = (<)
 operation (A.LE _) = (<=)
