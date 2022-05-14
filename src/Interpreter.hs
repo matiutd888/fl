@@ -8,11 +8,13 @@ import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
 import qualified Data.Either as DE
+import qualified Data.List as DL
 import qualified Data.Map as M
 import qualified Data.Maybe as DM
 import qualified Data.Set as S
 import Errors
 import PrintGramatyka (printTree)
+import TypeChecker (isType)
 
 -- TODO think about return.
 -- A flag will suffice. I think it should be saved in the environment.
@@ -43,7 +45,8 @@ data FunctionData =
   deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
 
 propagateFlags :: Env -> EvalT Env
-propagateFlags newEnv = ask >>= \env -> return $ env {hasReturn = hasReturn newEnv}
+propagateFlags newEnv =
+  ask >>= \env -> return $ env {hasReturn = hasReturn newEnv}
 
 newLoc :: MonadState Store m => m Loc
 newLoc = do
@@ -123,6 +126,13 @@ fromFunction pos d =
   typeCheckerError ++
   showPosition pos ++ "expected data of type function, received " ++ show d
 
+fromTuple :: A.BNFC'Position -> Data -> EvalT [Data]
+fromTuple pos (Tuple d) = return d
+fromTuple pos d =
+  throwError $
+  typeCheckerError ++
+  showPosition pos ++ "expected data of type tuple, received " ++ show d
+
 evalExpr :: A.Expr -> EvalT Data
 evalExpr (A.ELitTrue _) = return $ Bool True
 evalExpr (A.ELitFalse _) = return $ Bool False
@@ -183,10 +193,15 @@ evalExpr (A.EVar pos ident) = do
         Nothing ->
           throwError $ typeCheckerError ++ (undefinedReferenceMessage ident pos)
         Just f -> return $ Function f
-    Just l -> case DM.fromJust (M.lookup l $ memory s) of
-                NODATA -> throwError $ runTimeError ++ showPosition pos ++ " attempting to get the value of uinitialized value " ++ printTree ident
-                x -> return x
-
+    Just l ->
+      case DM.fromJust (M.lookup l $ memory s) of
+        NODATA ->
+          throwError $
+          runTimeError ++
+          showPosition pos ++
+          " attempting to get the value of uinitialized value " ++
+          printTree ident
+        x -> return x
 evalExpr (A.ETuple pos expressions) = do
   values <- mapM evalExpr expressions
   return $ Tuple values
@@ -202,10 +217,10 @@ evalExpr (A.ELambda pos (A.Lambda _ args rT block)) = do
       }
 evalExpr (A.EApp pos (A.LambdaCallee p l) exprs) = do
   function <- evalExpr (A.ELambda p l) >>= fromFunction p
-  handleFunction function exprs
+  handleFunction pos function exprs
 evalExpr (A.EApp pos (A.IdentCallee p ident) exprs) = do
   function <- evalExpr (A.EVar p ident) >>= fromFunction p
-  handleFunction function exprs
+  handleFunction pos function exprs
 
 evalWithLoc :: A.Expr -> EvalT Loc
 evalWithLoc e@(A.EVar pos ident) = do
@@ -219,8 +234,25 @@ evalWithLoc e =
   throwError $ typeCheckerError ++ showPositionOf e ++ "not a variable"
 
 -- Wywołuje funkcje function
-handleFunction :: FunctionData -> [A.Expr] -> EvalT Data
-handleFunction f@(FunctionData env stmt arguments retType) exprs = undefined
+handleFunction :: A.BNFC'Position -> FunctionData -> [A.Expr] -> EvalT Data
+handleFunction pos f@(FunctionData fenv stmt arguments retType) exprs = do
+  newFunctionEnv <- compose fenv (reverse (zipWith handleArg arguments exprs))
+  retEnv <- local (\_ -> newFunctionEnv) $ evalStmt stmt
+  if (hasReturn retEnv)
+    then do
+      store <- get
+      safeLookup "No return value found" retLoc (memory store)
+    else do
+      assertM
+        (isType retType A.Void)
+        (showPosition pos ++
+         "function returned no value, shoud return value of type " ++
+         printTree retType)
+      return $ Void
+  where
+    compose :: Monad m => a -> [a -> m a] -> m a
+    compose a (x:xs) = compose a xs >>= x
+    compose a [] = return a
 
 -- I'll do it later.
 -- Tutaj będę iterował się po argumentach
@@ -240,33 +272,36 @@ handleArg (A.Arg _ (A.ArgRef pos t) ident) expr envToAdd = do
 
 -- Typing statements
 evalStmt :: A.Stmt -> EvalT Env
-evalStmt (A.Empty pos) = ask >>= return
+evalStmt (A.Empty pos) = ask
 evalStmt (A.Ass pos ident expr) = do
   env <- ask
   d <- evalExpr expr
   l <- safeLookup (showPosition pos ++ typeCheckerError) ident (variables env)
   putData l d
-  ask >>= return
+  ask
 evalStmt (A.Cond pos expr stmt) = do
   b <- evalExpr expr >>= fromBool pos
   if b
-    then evalStmt stmt >>= propagateFlags >>= return
-    else ask >>= return
+    then evalStmt stmt >>= propagateFlags
+    else ask
 evalStmt (A.CondElse pos e s1 s2) = do
   b <- evalExpr e >>= fromBool pos
   (if b
      then evalStmt s1
-     else evalStmt s2) >>= propagateFlags >>= return
+     else evalStmt s2) >>=
+    propagateFlags
 evalStmt s@(A.While pos e stmt) = do
   b <- evalExpr e >>= fromBool pos
   if b
     then do
-      e <- evalStmt stmt >>= propagateFlags 
-      if (hasReturn e) then return e else evalStmt s
-    else ask >>= return
+      e <- evalStmt stmt >>= propagateFlags
+      if (hasReturn e)
+        then return e
+        else evalStmt s
+    else ask
 evalStmt (A.SExp pos e) = do
   evalExpr e
-  ask >>= return
+  ask
 evalStmt (A.Ret pos e) = do
   d <- evalExpr e
   putData retLoc d
@@ -278,7 +313,7 @@ evalStmt (A.VRet pos) = do
   return $ e {hasReturn = True}
 evalStmt (A.BStmt _ (A.Block _ stmts)) = do
   env <- ask
-  foldM handleStmtWithNewEnv env stmts >>= propagateFlags >>= return
+  foldM handleStmtWithNewEnv env stmts >>= propagateFlags
   where
     handleStmtWithNewEnv :: Env -> A.Stmt -> EvalT Env
     handleStmtWithNewEnv e s = do
@@ -286,20 +321,19 @@ evalStmt (A.BStmt _ (A.Block _ stmts)) = do
         then return e
         else local (\_ -> e) (evalStmt s)
 evalStmt (A.DeclStmt pos (A.Decl _ t items)) = do
-  env <- ask 
+  env <- ask
   foldM handleItem env items
-  where    
+  where
     handleItem :: Env -> A.Item -> EvalT Env
     handleItem newEnv (A.Init pos ident e) = do
       d <- local (\_ -> newEnv) $ evalExpr e
       l <- newLoc
       putData l d
-      return newEnv { variables = M.insert ident l (variables newEnv) }
-
+      return newEnv {variables = M.insert ident l (variables newEnv)}
     handleItem newEnv (A.NoInit pos ident) = do
       l <- newLoc
       putData l NODATA
-      return newEnv { variables = M.insert ident l (variables newEnv) }
+      return newEnv {variables = M.insert ident l (variables newEnv)}
 evalStmt (A.DeclStmt _ (A.FDecl pos retType ident args b)) = do
   en <- ask
   return $ en {functions = M.insert ident (fix (phi en)) (functions en)}
@@ -320,41 +354,41 @@ evalStmt (A.DeclStmt _ (A.FDecl pos retType ident args b)) = do
         (A.BStmt (A.hasPosition b) b)
         args
         retType
-evalStmt (TupleAss a [TupleIdent' a] (Expr' a))
+-- We can ignore the output.
+-- Env does not change during assignment.
+evalStmt (A.TupleAss p tupleIdents expr) = do
+  d <- evalExpr expr >>= fromTuple p
+  zipWithM handleIdent tupleIdents d
+  ask
+  where
+    handleIdent :: A.TupleIdent -> Data -> EvalT Env
+    handleIdent (A.TupleIdent pos ident) d = do
+      env <- ask
+      l <-
+        safeLookup (showPosition pos ++ typeCheckerError) ident (variables env)
+      putData l d
+      ask
+    handleIdent (A.TupleRec pos idents) (Tuple datas) = do
+      env <- ask
+      foldM propagateEnv env $ zip idents datas
+        -- Here I propagate env, although it's not neccessary as env does not change during assignment.
+      where
+        propagateEnv :: Env -> (A.TupleIdent, Data) -> EvalT Env
+        propagateEnv newEnv (ident, d) =
+          local (\_ -> newEnv) $ handleIdent ident d
+    handleIdent (A.TupleRec pos idents) _ =
+      throwError $
+      typeCheckerError ++ showPosition pos ++ " error unpacking tuple"
 
+evalTopDef :: A.TopDef -> EvalT Env
+evalTopDef (A.FnDef pos retType ident args body) =
+  evalStmt (A.DeclStmt pos (A.FDecl pos retType ident args body))
 
--- type Item = Item' BNFC'Position
--- data Item' a = NoInit a Ident | Init a Ident (Expr' a)
---   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
-
--- data FunctionData =
---   FunctionData
---     { env :: Env
---     , stmt :: A.Stmt
---     , arguments :: [A.Arg]
---     , retType :: A.Type
---     }
--- type Decl = Decl' BNFC'Position
--- data Decl' a
---     = Decl a (Type' a) [Item' a]
---     | FDecl a (Type' a) Ident [Arg' a] (Block' a)
--- evalStmt
--- type Stmt = Stmt' BNFC'Position
--- data Stmt' a
---     = Empty a DONE
---     | BStmt a (Block' a) DONE
---     | DeclStmt a (Decl' a)  DONE
---     | TupleAss a [TupleIdent' a] (Expr' a)
---     | Ass a Ident (Expr' a) DONE
---     | Ret a (Expr' a) DONE
---     | VRet a DONE
---     | Cond a (Expr' a) (Stmt' a) DONE
---     | CondElse a (Expr' a) (Stmt' a) (Stmt' a) DONE
---     | While a (Expr' a) (Stmt' a) DONE
---     | SExp a (Expr' a) DONE
---   deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
--- ~ type Lambda = Lambda' BNFC'Position
--- ~ data Lambda' a = Lambda a [Arg' a] (Type' a) (Block' a)
+-- typeProgram :: A.Program -> StmtTEval ()
+-- typeProgram (A.Program pos functions) = do
+--   assertM (Prelude.any checkIfMainDef functions) $ "no main function!"
+--   mapM_ handleTopDef functions
+--   return ()
 operation :: A.RelOp -> (Integer -> Integer -> Bool)
 operation (A.LTH _) = (<)
 operation (A.LE _) = (<=)
