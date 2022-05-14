@@ -11,15 +11,16 @@ import qualified Data.Set as S
 import Data.Text
 import Errors
 import PrintGramatyka (printTree)
-import TypeChecker
+import TypeChecker 
   ( ExprEnv(ExprEnv)
-  , assertM
   , getArgType
-  , isType
   , runExprTEval
   , typeOfExpr
-  , typesEq
   )
+import Utils (checkIfMainDef, isType, typesEq, assertM,
+  printInt, 
+  printString, 
+  printBool)
 
 -- Variables (holds variables of any type).
 -- Functions (holds function declarations, you can't assign to such functions. This map doesn't have info about
@@ -230,42 +231,9 @@ handleTopDef :: A.TopDef -> StmtTEval ()
 handleTopDef (A.FnDef pos retType ident args body) =
   typeStmt (A.DeclStmt pos (A.FDecl pos retType ident args body))
 
-checkIfMainDef :: A.TopDef -> Bool
-checkIfMainDef (A.FnDef pos retType ident args body) =
-  ident == A.Ident "main" && isType retType A.Int && args == []
-
 runStmtTEval :: Env -> StmtTEval a -> Either String (a, Env)
 runStmtTEval env e = runIdentity (runExceptT (runStateT e env))
 
-noPos :: A.BNFC'Position
-noPos = A.BNFC'NoPosition
-
-printInt :: A.TopDef
-printInt =
-  FnDef
-    noPos
-    (A.Void noPos)
-    (A.Ident "printInt")
-    [A.Arg noPos (A.ArgT noPos (A.Int noPos)) (A.Ident "x")]
-    (A.Block noPos [])
-
-printBool :: A.TopDef
-printBool =
-  FnDef
-    noPos
-    (A.Void noPos)
-    (A.Ident "printBool")
-    [A.Arg noPos (A.ArgT noPos (A.Bool noPos)) (A.Ident "x")]
-    (A.Block noPos [])
-
-printString :: A.TopDef
-printString =
-  FnDef
-    noPos
-    (A.Void noPos)
-    (A.Ident "printString")
-    [A.Arg noPos (A.ArgT noPos (A.Str noPos)) (A.Ident "x")]
-    (A.Block noPos [])
 
 addPrintFunctions :: Env -> Env
 addPrintFunctions e = snd $ DE.fromRight ((), initEnv) $ runStmtTEval e x
@@ -274,6 +242,8 @@ addPrintFunctions e = snd $ DE.fromRight ((), initEnv) $ runStmtTEval e x
       handleTopDef printInt
       handleTopDef printBool
       handleTopDef printString
+
+
 
 initEnv :: Env
 initEnv =

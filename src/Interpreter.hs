@@ -14,16 +14,23 @@ import qualified Data.Maybe as DM
 import qualified Data.Set as S
 import Errors
 import PrintGramatyka (printTree)
-import TypeChecker (isType)
+import Utils (isType, checkIfMainDef, assertM, printInt, printBool, printString)
 
--- TODO think about return.
--- A flag will suffice. I think it should be saved in the environment.
+
 type Loc = Integer
 
--- TODO tutaj można się zastanowić co z returnem. 
--- Sofar pomysłem jest dodać własny znacznik, który będzie wskazywał gdize w storze umieścić return. (-1)?
 retLoc :: Loc
 retLoc = -1
+
+data FunctionData =
+  FunctionData
+    { env :: Env
+    , stmt :: A.Stmt
+    , arguments :: [A.Arg]
+    , retType :: A.Type
+    }
+  deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
+
 
 -- Should functions be always passed by copy or by reference? Maybe both?
 -- My idea is that by reference. 
@@ -35,14 +42,6 @@ retLoc = -1
 -- That's why I cannot allow passing functions by reference - 
 -- I need to typecheck it - throw error if "ref" is near function type.
 -- For now I won't worry about it though - I want to write passing by reference variables.
-data FunctionData =
-  FunctionData
-    { env :: Env
-    , stmt :: A.Stmt
-    , arguments :: [A.Arg]
-    , retType :: A.Type
-    }
-  deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
 
 compose :: a -> [a -> EvalT a] -> EvalT a
 compose a l = composeHelp a (reverse l)
@@ -84,6 +83,9 @@ data Env =
     }
   deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
 
+initEnv :: Env
+initEnv = Env M.empty False M.empty
+
 -- TODO think what will be stored in function map, what in variables map and how it will change what we store in the memoryCell.
 data Data
   = Int Integer
@@ -101,8 +103,17 @@ data Store =
     { memory :: M.Map Loc Data
     , newloc :: Loc
     }
+    deriving (Prelude.Show)
+
+initStore :: Store
+initStore = Store M.empty 0
 
 type EvalT a = ReaderT Env (StateT Store (ExceptT String Identity)) a
+
+runEvalT :: Env -> Store ->  EvalT a -> Either String (a, Store)
+runEvalT env state e = runIdentity (runExceptT (runStateT (runReaderT e env) state))
+
+
 
 typeCheckerError :: String
 typeCheckerError = "TYPECHECKER ERROR "
@@ -379,12 +390,33 @@ evalStmt (A.TupleAss p tupleIdents expr) = do
       throwError $
       typeCheckerError ++ showPosition pos ++ " error unpacking tuple"
 
-evalTopDef :: A.TopDef -> EvalT Env
-evalTopDef (A.FnDef pos retType ident args body) =
+evalTopDef :: A.TopDef -> Env -> EvalT Env
+evalTopDef (A.FnDef pos retType ident args body) newEnv =
+  local (\_ -> newEnv) $
   evalStmt (A.DeclStmt pos (A.FDecl pos retType ident args body))
 
--- typeProgram :: A.Program -> StmtTEval ()
--- typeProgram (A.Program pos functions) = undefi
+evalProgram :: A.Program -> EvalT ()
+evalProgram (A.Program pos functions) = do
+  env <- ask
+  envWithFunctions <- compose env $ map evalTopDef functions
+  let mainCall =
+        A.EApp
+          A.BNFC'NoPosition
+          (A.IdentCallee A.BNFC'NoPosition (A.Ident "main"))
+          []
+  local (\_ -> envWithFunctions) (evalExpr mainCall) >> return ()
+
+addPrintFunctions :: Env -> Env
+addPrintFunctions e = fst $ DE.fromRight (initEnv, initStore) $ runEvalT e initStore x
+  where
+    x = do
+      e1 <- evalTopDef printInt e
+      e2 <- evalTopDef printBool e1
+      evalTopDef printString e2
+
+runInterpreter :: A.Program -> Either String ((), Store)
+runInterpreter p = runEvalT (addPrintFunctions initEnv) initStore $ evalProgram p
+
 operation :: A.RelOp -> (Integer -> Integer -> Bool)
 operation (A.LTH _) = (<)
 operation (A.LE _) = (<=)
