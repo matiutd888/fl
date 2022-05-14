@@ -44,6 +44,12 @@ data FunctionData =
     }
   deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
 
+compose :: a -> [a -> EvalT a] -> EvalT a
+compose a l = composeHelp a (reverse l)
+  where
+    composeHelp a (x:xs) = composeHelp a xs >>= x
+    composeHelp a [] = return a
+
 propagateFlags :: Env -> EvalT Env
 propagateFlags newEnv =
   ask >>= \env -> return $ env {hasReturn = hasReturn newEnv}
@@ -153,7 +159,7 @@ evalExpr (A.EMul pos e1 (A.Div _) e2) = do
   n2 <- evalExpr e2 >>= fromInt (A.hasPosition e2)
   assertM (n2 /= 0) $
     showPosition pos ++
-    "Attemtpting to perform division by zero, " ++
+    "attemtpting to perform division by zero, " ++
     printTree e2 ++ " is equal to zero"
   return $ Int $ div n1 n2
 evalExpr (A.EMul pos e1 (A.Mod _) e2) = do
@@ -161,7 +167,7 @@ evalExpr (A.EMul pos e1 (A.Mod _) e2) = do
   n2 <- evalExpr e2 >>= fromInt (A.hasPosition e2)
   assertM (n2 /= 0) $
     showPosition pos ++
-    "Attemtpting to perform modulo by zero, " ++
+    "attemtpting to perform modulo by zero, " ++
     printTree e2 ++ " is equal to zero"
   return $ Int $ mod n1 n2
 evalExpr (A.EAdd pos e1 (A.Plus _) e2) = do
@@ -199,7 +205,7 @@ evalExpr (A.EVar pos ident) = do
           throwError $
           runTimeError ++
           showPosition pos ++
-          " attempting to get the value of uinitialized value " ++
+          " attempting to read the value of uinitialized value " ++
           printTree ident
         x -> return x
 evalExpr (A.ETuple pos expressions) = do
@@ -236,7 +242,7 @@ evalWithLoc e =
 -- Wywołuje funkcje function
 handleFunction :: A.BNFC'Position -> FunctionData -> [A.Expr] -> EvalT Data
 handleFunction pos f@(FunctionData fenv stmt arguments retType) exprs = do
-  newFunctionEnv <- compose fenv (reverse (zipWith handleArg arguments exprs))
+  newFunctionEnv <- compose fenv $ zipWith handleArg arguments exprs
   retEnv <- local (\_ -> newFunctionEnv) $ evalStmt stmt
   if (hasReturn retEnv)
     then do
@@ -249,26 +255,22 @@ handleFunction pos f@(FunctionData fenv stmt arguments retType) exprs = do
          "function returned no value, shoud return value of type " ++
          printTree retType)
       return $ Void
+    -- I'll do it later.
+    -- Tutaj będę iterował się po argumentach
+    -- Jezeli będzie typ referencyjny to wezmę lokację expression i zapiszę pod daną zmienną
+    -- jeżeli będzie normalny to zewaluuję wyrażenie, zalokuję nową zmienną i do stora
+    -- w storze trzymając wartość tego wyrażenia.
+    -- ~ -- Ewaluacja wyrażenia jest w innym środowisku niż 
   where
-    compose :: Monad m => a -> [a -> m a] -> m a
-    compose a (x:xs) = compose a xs >>= x
-    compose a [] = return a
-
--- I'll do it later.
--- Tutaj będę iterował się po argumentach
--- Jezeli będzie typ referencyjny to wezmę lokację expression i zapiszę pod daną zmienną
--- jeżeli będzie normalny to zewaluuję wyrażenie, zalokuję nową zmienną i do stora
--- w storze trzymając wartość tego wyrażenia.
--- ~ -- Ewaluacja wyrażenia jest w innym środowisku niż 
-handleArg :: A.Arg -> A.Expr -> Env -> EvalT Env
-handleArg (A.Arg _ (A.ArgT pos t) ident) expr envToAdd = do
-  d <- evalExpr expr
-  l <- newLoc
-  putData l d
-  return envToAdd {variables = M.insert ident l (variables envToAdd)}
-handleArg (A.Arg _ (A.ArgRef pos t) ident) expr envToAdd = do
-  l <- evalWithLoc expr
-  return envToAdd {variables = M.insert ident l (variables envToAdd)}
+    handleArg :: A.Arg -> A.Expr -> Env -> EvalT Env
+    handleArg (A.Arg _ (A.ArgT pos t) ident) expr envToAdd = do
+      d <- evalExpr expr
+      l <- newLoc
+      putData l d
+      return envToAdd {variables = M.insert ident l (variables envToAdd)}
+    handleArg (A.Arg _ (A.ArgRef pos t) ident) expr envToAdd = do
+      l <- evalWithLoc expr
+      return envToAdd {variables = M.insert ident l (variables envToAdd)}
 
 -- Typing statements
 evalStmt :: A.Stmt -> EvalT Env
@@ -300,8 +302,7 @@ evalStmt s@(A.While pos e stmt) = do
         else evalStmt s
     else ask
 evalStmt (A.SExp pos e) = do
-  evalExpr e
-  ask
+  evalExpr e >> ask
 evalStmt (A.Ret pos e) = do
   d <- evalExpr e
   putData retLoc d
@@ -366,16 +367,14 @@ evalStmt (A.TupleAss p tupleIdents expr) = do
       env <- ask
       l <-
         safeLookup (showPosition pos ++ typeCheckerError) ident (variables env)
-      putData l d
-      ask
+      putData l d >> ask
     handleIdent (A.TupleRec pos idents) (Tuple datas) = do
       env <- ask
-      foldM propagateEnv env $ zip idents datas
+      compose env $ zipWith propagateEnv idents datas
         -- Here I propagate env, although it's not neccessary as env does not change during assignment.
       where
-        propagateEnv :: Env -> (A.TupleIdent, Data) -> EvalT Env
-        propagateEnv newEnv (ident, d) =
-          local (\_ -> newEnv) $ handleIdent ident d
+        propagateEnv :: A.TupleIdent -> Data -> Env -> EvalT Env
+        propagateEnv ident d newEnv = local (\_ -> newEnv) $ handleIdent ident d
     handleIdent (A.TupleRec pos idents) _ =
       throwError $
       typeCheckerError ++ showPosition pos ++ " error unpacking tuple"
@@ -385,10 +384,7 @@ evalTopDef (A.FnDef pos retType ident args body) =
   evalStmt (A.DeclStmt pos (A.FDecl pos retType ident args body))
 
 -- typeProgram :: A.Program -> StmtTEval ()
--- typeProgram (A.Program pos functions) = do
---   assertM (Prelude.any checkIfMainDef functions) $ "no main function!"
---   mapM_ handleTopDef functions
---   return ()
+-- typeProgram (A.Program pos functions) = undefi
 operation :: A.RelOp -> (Integer -> Integer -> Bool)
 operation (A.LTH _) = (<)
 operation (A.LE _) = (<=)
