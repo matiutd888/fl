@@ -22,14 +22,16 @@ type Loc = Integer
 retLoc :: Loc
 retLoc = -1
 
-data FunctionData =
+data FunctionArg = ArgCopy Data | ArgRef Loc
+
+data FunctionData = 
   FunctionData
     { env :: Env
-    , stmt :: A.Stmt
-    , arguments :: [A.Arg]
-    , retType :: A.Type
+      , functionEval :: A.BNFC'Position -> [FunctionArg] -> EvalT Data
+    -- , stmt :: A.Stmt
+      , arguments :: [A.Arg]
+      , retType :: A.Type
     }
-  deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
 
 
 -- Should functions be always passed by copy or by reference? Maybe both?
@@ -81,7 +83,6 @@ data Env =
     , hasReturn :: Bool -- It will be important in checking whether return has occured.
     , functions :: M.Map A.Ident FunctionData
     }
-  deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
 
 initEnv :: Env
 initEnv = Env M.empty False M.empty
@@ -95,7 +96,6 @@ data Data
   | Function FunctionData
   | Void
   | NODATA
-  deriving (Prelude.Eq, Prelude.Ord, Prelude.Show)
 
 -- Maybe we will need to store also something else in the future.
 data Store =
@@ -103,7 +103,6 @@ data Store =
     { memory :: M.Map Loc Data
     , newloc :: Loc
     }
-    deriving (Prelude.Show)
 
 initStore :: Store
 initStore = Store M.empty 0
@@ -126,7 +125,7 @@ fromInt pos (Int i) = return i
 fromInt pos d =
   throwError $
   typeCheckerError ++
-  showPosition pos ++ "expected data of type int, received " ++ show d
+  showPosition pos ++ "expected data of type int"
 
 -- ~ fromBool :: MonadError String m => A.BNFC'Position -> Data -> m Bool
 fromBool :: A.BNFC'Position -> Data -> EvalT Bool
@@ -134,21 +133,21 @@ fromBool pos (Bool b) = return b
 fromBool pos d =
   throwError $
   typeCheckerError ++
-  showPosition pos ++ "expected data of type bool, received " ++ show d
+  showPosition pos ++ "expected data of type bool"
 
 fromFunction :: A.BNFC'Position -> Data -> EvalT FunctionData
 fromFunction pos (Function f) = return f
 fromFunction pos d =
   throwError $
   typeCheckerError ++
-  showPosition pos ++ "expected data of type function, received " ++ show d
+  showPosition pos ++ "expected data of type function"
 
 fromTuple :: A.BNFC'Position -> Data -> EvalT [Data]
 fromTuple pos (Tuple d) = return d
 fromTuple pos d =
   throwError $
   typeCheckerError ++
-  showPosition pos ++ "expected data of type tuple, received " ++ show d
+  showPosition pos ++ "expected data of type tuple"
 
 evalExpr :: A.Expr -> EvalT Data
 evalExpr (A.ELitTrue _) = return $ Bool True
@@ -226,18 +225,47 @@ evalExpr (A.ELambda pos (A.Lambda _ args rT block)) = do
   e <- ask
   return $
     Function $
-    FunctionData
-      { env = e
-      , stmt = A.BStmt (A.hasPosition block) block
-      , retType = rT
-      , arguments = args
-      }
+    functionFromSyntax e (A.BStmt (A.hasPosition block) block) args rT
 evalExpr (A.EApp pos (A.LambdaCallee p l) exprs) = do
   function <- evalExpr (A.ELambda p l) >>= fromFunction p
   handleFunction pos function exprs
 evalExpr (A.EApp pos (A.IdentCallee p ident) exprs) = do
   function <- evalExpr (A.EVar p ident) >>= fromFunction p
   handleFunction pos function exprs
+functionFromSyntax :: Env -> A.Stmt -> [A.Arg]  -> A.Type  -> FunctionData
+functionFromSyntax fenv stmt args retType = do
+  FunctionData fenv eval args retType
+  where 
+    eval pos functionArgs = do
+      newFunctionEnv <- compose fenv $ zipWith handleArg args functionArgs
+      retEnv <- local (\_ -> newFunctionEnv) $ evalStmt stmt
+      if (hasReturn retEnv)
+        then do
+          store <- get
+          safeLookup "No return value found" retLoc (memory store)
+        else do
+          assertM
+            (isType retType A.Void)
+            ( showPosition pos ++ 
+            "function returned no value, shoud return value of type " ++
+            printTree retType)
+          return $ Void
+    handleArg :: A.Arg -> FunctionArg -> Env -> EvalT Env
+    handleArg (A.Arg _ (A.ArgT _ _) ident) (ArgCopy d) envToAdd = do
+      l <- newLoc
+      putData l d
+      return envToAdd {variables = M.insert ident l (variables envToAdd)}
+    handleArg (A.Arg _ (A.ArgRef _ _) ident) (ArgRef l) envToAdd = do
+        return envToAdd {variables = M.insert ident l (variables envToAdd)}
+    handleArg _ _ _ = throwError typeCheckerError
+handleFunction :: A.BNFC'Position -> FunctionData -> [A.Expr] -> EvalT Data
+handleFunction pos f exprs = do
+  arguments <- zipWithM handleArg (arguments f) exprs
+  (functionEval f) pos arguments
+  where 
+    handleArg :: A.Arg -> A.Expr -> EvalT FunctionArg
+    handleArg (A.Arg _ (A.ArgT pos t) _) expr = evalExpr expr >>= \d -> return $ ArgCopy d
+    handleArg (A.Arg _ (A.ArgRef pos t) ident) expr = evalWithLoc expr >>= \d -> return $ ArgRef d
 
 evalWithLoc :: A.Expr -> EvalT Loc
 evalWithLoc e@(A.EVar pos ident) = do
@@ -251,37 +279,26 @@ evalWithLoc e =
   throwError $ typeCheckerError ++ showPositionOf e ++ "not a variable"
 
 -- Wywołuje funkcje function
-handleFunction :: A.BNFC'Position -> FunctionData -> [A.Expr] -> EvalT Data
-handleFunction pos f@(FunctionData fenv stmt arguments retType) exprs = do
-  newFunctionEnv <- compose fenv $ zipWith handleArg arguments exprs
-  retEnv <- local (\_ -> newFunctionEnv) $ evalStmt stmt
-  if (hasReturn retEnv)
-    then do
-      store <- get
-      safeLookup "No return value found" retLoc (memory store)
-    else do
-      assertM
-        (isType retType A.Void)
-        (showPosition pos ++
-         "function returned no value, shoud return value of type " ++
-         printTree retType)
-      return $ Void
-    -- I'll do it later.
-    -- Tutaj będę iterował się po argumentach
-    -- Jezeli będzie typ referencyjny to wezmę lokację expression i zapiszę pod daną zmienną
-    -- jeżeli będzie normalny to zewaluuję wyrażenie, zalokuję nową zmienną i do stora
-    -- w storze trzymając wartość tego wyrażenia.
-    -- ~ -- Ewaluacja wyrażenia jest w innym środowisku niż 
-  where
-    handleArg :: A.Arg -> A.Expr -> Env -> EvalT Env
-    handleArg (A.Arg _ (A.ArgT pos t) ident) expr envToAdd = do
-      d <- evalExpr expr
-      l <- newLoc
-      putData l d
-      return envToAdd {variables = M.insert ident l (variables envToAdd)}
-    handleArg (A.Arg _ (A.ArgRef pos t) ident) expr envToAdd = do
-      l <- evalWithLoc expr
-      return envToAdd {variables = M.insert ident l (variables envToAdd)}
+-- handleFunction :: A.BNFC'Position -> FunctionData -> [A.Expr] -> EvalT Data
+-- handleFunction pos f@(FunctionData fenv stmt arguments retType) exprs = do
+--   newFunctionEnv <- compose fenv $ zipWith handleArg arguments exprs
+  
+--     -- I'll do it later.
+--     -- Tutaj będę iterował się po argumentach
+--     -- Jezeli będzie typ referencyjny to wezmę lokację expression i zapiszę pod daną zmienną
+--     -- jeżeli będzie normalny to zewaluuję wyrażenie, zalokuję nową zmienną i do stora
+--     -- w storze trzymając wartość tego wyrażenia.
+--     -- ~ -- Ewaluacja wyrażenia jest w innym środowisku niż 
+--   where
+--     handleArg :: A.Arg -> A.Expr -> Env -> EvalT Env
+--     handleArg (A.Arg _ (A.ArgT pos t) ident) expr envToAdd = do
+--       d <- evalExpr expr
+--       l <- newLoc
+--       putData l d
+--       return envToAdd {variables = M.insert ident l (variables envToAdd)}
+--     handleArg (A.Arg _ (A.ArgRef pos t) ident) expr envToAdd = do
+--       l <- evalWithLoc expr
+--       return envToAdd {variables = M.insert ident l (variables envToAdd)}
 
 -- Typing statements
 evalStmt :: A.Stmt -> EvalT Env
@@ -361,11 +378,12 @@ evalStmt (A.DeclStmt _ (A.FDecl pos retType ident args b)) = do
   where
     phi :: Env -> FunctionData -> FunctionData
     phi e f =
-      FunctionData
+      functionFromSyntax
         (e {functions = M.insert ident f (functions e)})
         (A.BStmt (A.hasPosition b) b)
         args
         retType
+        
 -- We can ignore the output.
 -- Env does not change during assignment.
 evalStmt (A.TupleAss p tupleIdents expr) = do
