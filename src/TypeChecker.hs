@@ -14,11 +14,11 @@ import Control.Monad.Except
 import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
+import qualified Data.Map as M
+import Data.Text
 import Errors
 import PrintGramatyka
 import Utils
-import qualified Data.Map as M
-import Data.Text
 
 data ExprEnv =
   ExprEnv
@@ -165,5 +165,3 @@ checkForType typeConstructor pos t =
   assertM
     (isType t typeConstructor)
     (errorMessageWrongType pos t $ typeConstructor pos)
-
-

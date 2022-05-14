@@ -11,6 +11,7 @@ main = do
     _ -> 
       do 
         putStrLn "TYPECHECK OK" 
-        case runInterpreter p of
+        interpreterOutput <- runInterpreter p
+        case interpreterOutput of
           Left m -> putStr m
           right -> putStrLn "No error in interpreter"

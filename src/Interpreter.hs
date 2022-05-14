@@ -14,25 +14,26 @@ import qualified Data.Maybe as DM
 import qualified Data.Set as S
 import Errors
 import PrintGramatyka (printTree)
-import Utils (isType, checkIfMainDef, assertM, printInt, printBool, printString)
-
+import System.IO
+import Utils (assertM, checkIfMainDef, isType, noPos)
 
 type Loc = Integer
 
 retLoc :: Loc
 retLoc = -1
 
-data FunctionArg = ArgCopy Data | ArgRef Loc
+data FunctionArg
+  = ArgCopy Data
+  | ArgRef Loc
 
-data FunctionData = 
+data FunctionData =
   FunctionData
     { env :: Env
-      , functionEval :: A.BNFC'Position -> [FunctionArg] -> EvalT Data
+    , functionEval :: A.BNFC'Position -> [FunctionArg] -> EvalT Data
     -- , stmt :: A.Stmt
-      , arguments :: [A.Arg]
-      , retType :: A.Type
+    , arguments :: [A.Arg]
+    , retType :: A.Type
     }
-
 
 -- Should functions be always passed by copy or by reference? Maybe both?
 -- My idea is that by reference. 
@@ -44,7 +45,6 @@ data FunctionData =
 -- That's why I cannot allow passing functions by reference - 
 -- I need to typecheck it - throw error if "ref" is near function type.
 -- For now I won't worry about it though - I want to write passing by reference variables.
-
 compose :: a -> [a -> EvalT a] -> EvalT a
 compose a l = composeHelp a (reverse l)
   where
@@ -107,12 +107,10 @@ data Store =
 initStore :: Store
 initStore = Store M.empty 0
 
-type EvalT a = ReaderT Env (StateT Store (ExceptT String Identity)) a
+type EvalT a = ReaderT Env (StateT Store (ExceptT String IO)) a
 
-runEvalT :: Env -> Store ->  EvalT a -> Either String (a, Store)
-runEvalT env state e = runIdentity (runExceptT (runStateT (runReaderT e env) state))
-
-
+runEvalT :: Env -> Store -> EvalT a -> IO (Either String (a, Store))
+runEvalT env state e = runExceptT (runStateT (runReaderT e env) state) 
 
 typeCheckerError :: String
 typeCheckerError = "TYPECHECKER ERROR "
@@ -124,30 +122,26 @@ fromInt :: A.BNFC'Position -> Data -> EvalT Integer
 fromInt pos (Int i) = return i
 fromInt pos d =
   throwError $
-  typeCheckerError ++
-  showPosition pos ++ "expected data of type int"
+  typeCheckerError ++ showPosition pos ++ "expected data of type int"
 
 -- ~ fromBool :: MonadError String m => A.BNFC'Position -> Data -> m Bool
 fromBool :: A.BNFC'Position -> Data -> EvalT Bool
 fromBool pos (Bool b) = return b
 fromBool pos d =
   throwError $
-  typeCheckerError ++
-  showPosition pos ++ "expected data of type bool"
+  typeCheckerError ++ showPosition pos ++ "expected data of type bool"
 
 fromFunction :: A.BNFC'Position -> Data -> EvalT FunctionData
 fromFunction pos (Function f) = return f
 fromFunction pos d =
   throwError $
-  typeCheckerError ++
-  showPosition pos ++ "expected data of type function"
+  typeCheckerError ++ showPosition pos ++ "expected data of type function"
 
 fromTuple :: A.BNFC'Position -> Data -> EvalT [Data]
 fromTuple pos (Tuple d) = return d
 fromTuple pos d =
   throwError $
-  typeCheckerError ++
-  showPosition pos ++ "expected data of type tuple"
+  typeCheckerError ++ showPosition pos ++ "expected data of type tuple"
 
 evalExpr :: A.Expr -> EvalT Data
 evalExpr (A.ELitTrue _) = return $ Bool True
@@ -232,10 +226,11 @@ evalExpr (A.EApp pos (A.LambdaCallee p l) exprs) = do
 evalExpr (A.EApp pos (A.IdentCallee p ident) exprs) = do
   function <- evalExpr (A.EVar p ident) >>= fromFunction p
   handleFunction pos function exprs
-functionFromSyntax :: Env -> A.Stmt -> [A.Arg]  -> A.Type  -> FunctionData
+
+functionFromSyntax :: Env -> A.Stmt -> [A.Arg] -> A.Type -> FunctionData
 functionFromSyntax fenv stmt args retType = do
   FunctionData fenv eval args retType
-  where 
+  where
     eval pos functionArgs = do
       newFunctionEnv <- compose fenv $ zipWith handleArg args functionArgs
       retEnv <- local (\_ -> newFunctionEnv) $ evalStmt stmt
@@ -246,9 +241,9 @@ functionFromSyntax fenv stmt args retType = do
         else do
           assertM
             (isType retType A.Void)
-            ( showPosition pos ++ 
-            "function returned no value, shoud return value of type " ++
-            printTree retType)
+            (showPosition pos ++
+             "function returned no value, shoud return value of type " ++
+             printTree retType)
           return $ Void
     handleArg :: A.Arg -> FunctionArg -> Env -> EvalT Env
     handleArg (A.Arg _ (A.ArgT _ _) ident) (ArgCopy d) envToAdd = do
@@ -256,16 +251,19 @@ functionFromSyntax fenv stmt args retType = do
       putData l d
       return envToAdd {variables = M.insert ident l (variables envToAdd)}
     handleArg (A.Arg _ (A.ArgRef _ _) ident) (ArgRef l) envToAdd = do
-        return envToAdd {variables = M.insert ident l (variables envToAdd)}
+      return envToAdd {variables = M.insert ident l (variables envToAdd)}
     handleArg _ _ _ = throwError typeCheckerError
+
 handleFunction :: A.BNFC'Position -> FunctionData -> [A.Expr] -> EvalT Data
 handleFunction pos f exprs = do
   arguments <- zipWithM handleArg (arguments f) exprs
   (functionEval f) pos arguments
-  where 
+  where
     handleArg :: A.Arg -> A.Expr -> EvalT FunctionArg
-    handleArg (A.Arg _ (A.ArgT pos t) _) expr = evalExpr expr >>= \d -> return $ ArgCopy d
-    handleArg (A.Arg _ (A.ArgRef pos t) ident) expr = evalWithLoc expr >>= \d -> return $ ArgRef d
+    handleArg (A.Arg _ (A.ArgT pos t) _) expr =
+      evalExpr expr >>= \d -> return $ ArgCopy d
+    handleArg (A.Arg _ (A.ArgRef pos t) ident) expr =
+      evalWithLoc expr >>= \d -> return $ ArgRef d
 
 evalWithLoc :: A.Expr -> EvalT Loc
 evalWithLoc e@(A.EVar pos ident) = do
@@ -282,7 +280,6 @@ evalWithLoc e =
 -- handleFunction :: A.BNFC'Position -> FunctionData -> [A.Expr] -> EvalT Data
 -- handleFunction pos f@(FunctionData fenv stmt arguments retType) exprs = do
 --   newFunctionEnv <- compose fenv $ zipWith handleArg arguments exprs
-  
 --     -- I'll do it later.
 --     -- Tutaj będę iterował się po argumentach
 --     -- Jezeli będzie typ referencyjny to wezmę lokację expression i zapiszę pod daną zmienną
@@ -299,7 +296,6 @@ evalWithLoc e =
 --     handleArg (A.Arg _ (A.ArgRef pos t) ident) expr envToAdd = do
 --       l <- evalWithLoc expr
 --       return envToAdd {variables = M.insert ident l (variables envToAdd)}
-
 -- Typing statements
 evalStmt :: A.Stmt -> EvalT Env
 evalStmt (A.Empty pos) = ask
@@ -383,7 +379,6 @@ evalStmt (A.DeclStmt _ (A.FDecl pos retType ident args b)) = do
         (A.BStmt (A.hasPosition b) b)
         args
         retType
-        
 -- We can ignore the output.
 -- Env does not change during assignment.
 evalStmt (A.TupleAss p tupleIdents expr) = do
@@ -424,16 +419,59 @@ evalProgram (A.Program pos functions) = do
           []
   local (\_ -> envWithFunctions) (evalExpr mainCall) >> return ()
 
-addPrintFunctions :: Env -> Env
-addPrintFunctions e = fst $ DE.fromRight (initEnv, initStore) $ runEvalT e initStore x
+-- data FunctionData = 
+--   FunctionData
+--     { env :: Env
+--       , functionEval :: A.BNFC'Position -> [FunctionArg] -> EvalT Data
+--     -- , stmt :: A.Stmt
+--       , arguments :: [A.Arg]
+--       , retType :: A.Type
+--     }
+-- (A.Arg _ (A.ArgT _ _) ident)
+printBool :: FunctionData
+printBool =
+  FunctionData
+    initEnv
+    evalPrint
+    [A.Arg noPos (A.ArgT noPos (A.Bool noPos)) (A.Ident "x")]
+    (A.Void noPos)
   where
-    x = do
-      e1 <- evalTopDef printInt e
-      e2 <- evalTopDef printBool e1
-      evalTopDef printString e2
+    evalPrint p [ArgCopy (Bool b)] = liftIO (putStrLn $ show b) >> return Void
+    evalPrint p _ = throwError $ showPosition p ++ "wrong use of printBool"
 
-runInterpreter :: A.Program -> Either String ((), Store)
-runInterpreter p = runEvalT (addPrintFunctions initEnv) initStore $ evalProgram p
+printInt :: FunctionData
+printInt =
+  FunctionData
+    initEnv
+    evalPrint
+    [A.Arg noPos (A.ArgT noPos (A.Int noPos)) (A.Ident "x")]
+    (A.Void noPos)
+  where
+    evalPrint p [ArgCopy (Int n)] = liftIO (putStrLn $ show n) >> return Void
+    evalPrint p _ = throwError $ showPosition p ++ "wrong use of printInt"
+
+printString :: FunctionData
+printString =
+  FunctionData
+    initEnv
+    evalPrint
+    [A.Arg noPos (A.ArgT noPos (A.Str noPos)) (A.Ident "x")]
+    (A.Void noPos)
+  where
+    evalPrint p [ArgCopy (Str s)] = liftIO (putStrLn s) >> return Void
+    evalPrint p _ = throwError $ showPosition p ++ "wrong use of printString"
+
+addPrintFunctions :: Env -> Env
+addPrintFunctions e = e {functions = x (functions e)}
+  where
+    x =
+      M.insert (A.Ident "printInt") printInt .
+      M.insert (A.Ident "printBool") printBool .
+      M.insert (A.Ident "printString") printString
+
+runInterpreter :: A.Program -> IO (Either String ((), Store))
+runInterpreter p =
+  runEvalT (addPrintFunctions initEnv) initStore $ evalProgram p
 
 operation :: A.RelOp -> (Integer -> Integer -> Bool)
 operation (A.LTH _) = (<)

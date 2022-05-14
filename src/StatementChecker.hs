@@ -11,16 +11,16 @@ import qualified Data.Set as S
 import Data.Text
 import Errors
 import PrintGramatyka (printTree)
-import TypeChecker 
-  ( ExprEnv(ExprEnv)
-  , getArgType
-  , runExprTEval
-  , typeOfExpr
+import TypeChecker (ExprEnv(ExprEnv), getArgType, runExprTEval, typeOfExpr)
+import Utils
+  ( assertM
+  , checkIfMainDef
+  , isType
+  , printBool
+  , printInt
+  , printString
+  , typesEq
   )
-import Utils (checkIfMainDef, isType, typesEq, assertM,
-  printInt, 
-  printString, 
-  printBool)
 
 -- Variables (holds variables of any type).
 -- Functions (holds function declarations, you can't assign to such functions. This map doesn't have info about
@@ -234,7 +234,6 @@ handleTopDef (A.FnDef pos retType ident args body) =
 runStmtTEval :: Env -> StmtTEval a -> Either String (a, Env)
 runStmtTEval env e = runIdentity (runExceptT (runStateT e env))
 
-
 addPrintFunctions :: Env -> Env
 addPrintFunctions e = snd $ DE.fromRight ((), initEnv) $ runStmtTEval e x
   where
@@ -242,8 +241,6 @@ addPrintFunctions e = snd $ DE.fromRight ((), initEnv) $ runStmtTEval e x
       handleTopDef printInt
       handleTopDef printBool
       handleTopDef printString
-
-
 
 initEnv :: Env
 initEnv =
