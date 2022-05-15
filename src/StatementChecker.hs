@@ -214,13 +214,7 @@ checkExpressionType t expr = do
   assertM (typesEq exprType t) $
     errorMessageWrongType (hasPosition expr) exprType t
   return ()
-  -- ~ deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
-  -- ~ deriving (C.Eq, C.Ord, C.Show, C.Read, C.Functor, C.Foldable, C.Traversable)
 
--- ~ type Program = Program' BNFC'Position
--- ~ data Program' a = Program a [TopDef' a]
--- ~ type TopDef = TopDef' BNFC'Position
--- ~ data TopDef' a = FnDef a (Type' a) Ident [Arg' a] (Block' a)
 typeProgram :: A.Program -> StmtTEval ()
 typeProgram (A.Program pos functions) = do
   assertM (Prelude.any checkIfMainDef functions) $ "no main function!"

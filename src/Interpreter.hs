@@ -30,21 +30,10 @@ data FunctionData =
   FunctionData
     { env :: Env
     , functionEval :: A.BNFC'Position -> [FunctionArg] -> EvalT Data
-    -- , stmt :: A.Stmt
     , arguments :: [A.Arg]
     , retType :: A.Type
     }
 
--- Should functions be always passed by copy or by reference? Maybe both?
--- My idea is that by reference. 
--- Why? Function has evironment. To pass function by value I would have to change environment so that
--- all local variables in function (Yes, there can be local variables in function because of closures)
--- Won't be affected.
--- I have to typecheck ref function.
--- TODO.
--- That's why I cannot allow passing functions by reference - 
--- I need to typecheck it - throw error if "ref" is near function type.
--- For now I won't worry about it though - I want to write passing by reference variables.
 compose :: a -> [a -> EvalT a] -> EvalT a
 compose a l = composeHelp a (reverse l)
   where
@@ -87,7 +76,6 @@ data Env =
 initEnv :: Env
 initEnv = Env M.empty False M.empty
 
--- TODO think what will be stored in function map, what in variables map and how it will change what we store in the memoryCell.
 data Data
   = Int Integer
   | Str String
@@ -97,7 +85,6 @@ data Data
   | Void
   | NODATA
 
--- Maybe we will need to store also something else in the future.
 data Store =
   Store
     { memory :: M.Map Loc Data
@@ -110,7 +97,7 @@ initStore = Store M.empty 0
 type EvalT a = ReaderT Env (StateT Store (ExceptT String IO)) a
 
 runEvalT :: Env -> Store -> EvalT a -> IO (Either String (a, Store))
-runEvalT env state e = runExceptT (runStateT (runReaderT e env) state) 
+runEvalT env state e = runExceptT (runStateT (runReaderT e env) state)
 
 typeCheckerError :: String
 typeCheckerError = "TYPECHECKER ERROR "
@@ -276,27 +263,6 @@ evalWithLoc e@(A.EVar pos ident) = do
 evalWithLoc e =
   throwError $ typeCheckerError ++ showPositionOf e ++ "not a variable"
 
--- Wywołuje funkcje function
--- handleFunction :: A.BNFC'Position -> FunctionData -> [A.Expr] -> EvalT Data
--- handleFunction pos f@(FunctionData fenv stmt arguments retType) exprs = do
---   newFunctionEnv <- compose fenv $ zipWith handleArg arguments exprs
---     -- I'll do it later.
---     -- Tutaj będę iterował się po argumentach
---     -- Jezeli będzie typ referencyjny to wezmę lokację expression i zapiszę pod daną zmienną
---     -- jeżeli będzie normalny to zewaluuję wyrażenie, zalokuję nową zmienną i do stora
---     -- w storze trzymając wartość tego wyrażenia.
---     -- ~ -- Ewaluacja wyrażenia jest w innym środowisku niż 
---   where
---     handleArg :: A.Arg -> A.Expr -> Env -> EvalT Env
---     handleArg (A.Arg _ (A.ArgT pos t) ident) expr envToAdd = do
---       d <- evalExpr expr
---       l <- newLoc
---       putData l d
---       return envToAdd {variables = M.insert ident l (variables envToAdd)}
---     handleArg (A.Arg _ (A.ArgRef pos t) ident) expr envToAdd = do
---       l <- evalWithLoc expr
---       return envToAdd {variables = M.insert ident l (variables envToAdd)}
--- Typing statements
 evalStmt :: A.Stmt -> EvalT Env
 evalStmt (A.Empty pos) = ask
 evalStmt (A.Ass pos ident expr) = do
@@ -419,15 +385,6 @@ evalProgram (A.Program pos functions) = do
           []
   local (\_ -> envWithFunctions) (evalExpr mainCall) >> return ()
 
--- data FunctionData = 
---   FunctionData
---     { env :: Env
---       , functionEval :: A.BNFC'Position -> [FunctionArg] -> EvalT Data
---     -- , stmt :: A.Stmt
---       , arguments :: [A.Arg]
---       , retType :: A.Type
---     }
--- (A.Arg _ (A.ArgT _ _) ident)
 printBool :: FunctionData
 printBool =
   FunctionData
@@ -480,9 +437,3 @@ operation (A.GTH _) = (>)
 operation (A.GE _) = (>=)
 operation (A.EQU _) = (==)
 operation (A.NE _) = (/=)
-    -- ~ LTH p -> p
-    -- ~ LE p -> p
-    -- ~ GTH p -> p
-    -- ~ GE p -> p
-    -- ~ EQU p -> p
-    -- ~ NE p -> p
