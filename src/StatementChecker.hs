@@ -20,6 +20,7 @@ import Utils
   , printInt
   , printString
   , typesEq
+  , assert
   )
 
 -- Variables (holds variables of any type).
@@ -136,7 +137,7 @@ typeStmt (BStmt _ (Block pos stmts)) = do
   return ()
 
 handleTupleIdent :: A.TupleIdent -> A.Type -> StmtTEval ()
-handleTupleIdent (A.TupleNoIdent pos) _ = return () 
+handleTupleIdent (A.TupleNoIdent pos) _ = return ()
 handleTupleIdent (A.TupleIdent pos ident) t
   -- Same code as during assignment, only don't check the type of expression 
   -- (as we know the type from typing the tuple).
@@ -229,17 +230,18 @@ handleTopDef (A.FnDef pos retType ident args body) =
 runStmtTEval :: Env -> StmtTEval a -> Either String (a, Env)
 runStmtTEval env e = runIdentity (runExceptT (runStateT e env))
 
-addPrintFunctions :: Env -> Env
-addPrintFunctions e = snd $ DE.fromRight ((), initEnv) $ runStmtTEval e x
+addFunctions :: Env -> Env
+addFunctions e = snd $ DE.fromRight ((), initEnv) $ runStmtTEval e x
   where
     x = do
       handleTopDef printInt
       handleTopDef printBool
       handleTopDef printString
+      handleTopDef assert
 
 initEnv :: Env
 initEnv =
-  addPrintFunctions $
+  addFunctions $
   Env
     { variables = M.empty
     , variableLevels = M.empty

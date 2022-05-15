@@ -177,6 +177,8 @@ evalExpr (A.EOr pos e1 e2) = do
   n1 <- evalExpr e1 >>= fromBool (A.hasPosition e1)
   n2 <- evalExpr e2 >>= fromBool (A.hasPosition e2)
   return $ Bool $ n1 || n2
+evalExpr (A.ERel pos e1 () e2) = do
+
 evalExpr (A.ERel pos e1 relop e2) = do
   n1 <- evalExpr e1 >>= fromInt (A.hasPosition e1)
   n2 <- evalExpr e2 >>= fromInt (A.hasPosition e2)
@@ -375,16 +377,12 @@ evalTopDef (A.FnDef pos retType ident args body) newEnv =
   local (\_ -> newEnv) $
   evalStmt (A.DeclStmt pos (A.FDecl pos retType ident args body))
 
-evalProgram :: A.Program -> EvalT ()
+evalProgram :: A.Program -> EvalT Integer
 evalProgram (A.Program pos functions) = do
   env <- ask
   envWithFunctions <- compose env $ map evalTopDef functions
-  let mainCall =
-        A.EApp
-          A.BNFC'NoPosition
-          (A.IdentCallee A.BNFC'NoPosition (A.Ident "main"))
-          []
-  local (\_ -> envWithFunctions) (evalExpr mainCall) >> return ()
+  let mainCall = A.EApp noPos (A.IdentCallee noPos (A.Ident "main")) []
+  local (\_ -> envWithFunctions) (evalExpr mainCall) >>= fromInt noPos
 
 printBool :: FunctionData
 printBool =
@@ -419,21 +417,33 @@ printString =
     evalPrint p [ArgCopy (Str s)] = liftIO (putStrLn s) >> return Void
     evalPrint p _ = throwError $ showPosition p ++ "wrong use of printString"
 
-addPrintFunctions :: Env -> Env
-addPrintFunctions e = e {functions = x (functions e)}
+assert :: FunctionData
+assert =
+  FunctionData
+    initEnv
+    evalAssert
+    [A.Arg noPos (A.ArgT noPos (A.Bool noPos)) (A.Ident "x")]
+    (A.Void noPos)
+  where
+    evalAssert p [ArgCopy (Bool b)] =
+      assertM b (showPosition p ++ "assertion failed") >> return Void
+    evalAssert p _ = throwError $ showPosition p ++ "wrong use of assert"
+
+addFunctions :: Env -> Env
+addFunctions e = e {functions = x (functions e)}
   where
     x =
       M.insert (A.Ident "printInt") printInt .
       M.insert (A.Ident "printBool") printBool .
-      M.insert (A.Ident "printString") printString
+      M.insert (A.Ident "printString") printString .
+      M.insert (A.Ident "assert") assert
 
-runInterpreter :: A.Program -> IO (Either String ((), Store))
-runInterpreter p =
-  runEvalT (addPrintFunctions initEnv) initStore $ evalProgram p
+runInterpreter :: A.Program -> IO (Either String (Integer, Store))
+runInterpreter p = runEvalT (addFunctions initEnv) initStore $ evalProgram p
 
-operation :: A.RelOp -> (Integer -> Integer -> Bool)
-operation (A.LTH _) = (<) 
-operation (A.LE _) = (<=) 
+operation :: Ord a => A.RelOp -> (a -> a -> Bool)
+operation (A.LTH _) = (<)
+operation (A.LE _) = (<=)
 operation (A.GTH _) = (>)
 operation (A.GE _) = (>=)
 operation (A.EQU _) = (==)

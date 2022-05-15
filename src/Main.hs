@@ -14,4 +14,4 @@ main = do
         interpreterOutput <- runInterpreter p
         case interpreterOutput of
           Left m -> putStr m
-          right -> putStrLn "No error in interpreter"
+          Right (exitCode, _) -> putStrLn $ "Program exited with code " ++ show exitCode

@@ -66,6 +66,13 @@ printInt =
     [A.Arg noPos (A.ArgT noPos (A.Int noPos)) (A.Ident "x")]
     (A.Block noPos [])
 
+assert :: A.TopDef
+assert =  FnDef
+    noPos
+    (A.Void noPos)
+    (A.Ident "assert")
+    [A.Arg noPos (A.ArgT noPos (A.Bool noPos)) (A.Ident "x")]
+    (A.Block noPos [])
 
 assertM :: MonadError String m => Bool -> String -> m ()
 assertM b s =
