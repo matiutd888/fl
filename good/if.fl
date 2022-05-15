@@ -1,7 +1,10 @@
 int main() {
-    bool x;
+    bool x = true;
     if (x) {
-        2;
+        printString("Ifs do work!");
+    } else {
+        printString("ifs don't work :( ");
     }
+    return 0;
 }
 

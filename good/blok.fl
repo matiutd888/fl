@@ -2,8 +2,22 @@ int main() {
     int x = 10;
     {
         x = 5;
-        string x = "siema";
-        printString(x);
+        string x = "blocks work!";
+        assert(x == "blocks work!");
     }
+    assert(x == 5);
+    
+    int f() {
+       return 1; 
+    };
+    assert(f() == 1);
+    {
+        string f() {
+            return "siema";
+        };
+        assert(f() == "siema");
+    }
+    assert(f() == 1);
+    
     return 0;
 }

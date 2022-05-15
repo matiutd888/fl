@@ -1,7 +1,0 @@
-int main() {
-   printInt(2 * (2 + 10));
-    int x = 2;
-   printInt(x / 0);
-   printString("cześć");
-    return 1;
-}

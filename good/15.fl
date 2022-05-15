@@ -1,0 +1,31 @@
+int main() {
+    void changeTuple(tuple<string, int> ref t) {
+        t = ["changed", 42];    
+    };
+    
+    tuple<int, tuple<string, int>> t;
+    t = [2, ["a", 3]];
+    assert(t == [2, ["a", 3]]);
+    
+    int s, w;
+    string h;
+    <s, <h, w>> = t;
+    assert(s == 2);
+    assert(h == "a");
+    assert(w == 3);
+    
+    tuple<string, int> k;
+    <_, k> = t;
+    assert(k == ["a", 3]);
+    
+    // Passing tuple by reference.
+    changeTuple(k);
+    assert(k == ["changed", 42]);
+    
+    // Zagnieżdzenie2;
+    tuple<int> t;
+    <s, t> = ["zagnieżdżenie2", [15]];
+    assert(t == [15]);
+    
+    return 0;
+}

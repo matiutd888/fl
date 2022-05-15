@@ -1,0 +1,26 @@
+int main() {
+    function<string(int ref)> f = lambda: (int ref x) -> string {
+        x = x * 2;
+        return "test";
+
+    };
+    int s = 10;
+    f(s);
+    assert(s == 2 * 10);
+    {
+        f = lambda: (int ref x) -> string {
+            x = x + 21;
+            return "lambda assignment worked successfully";
+        };
+    }
+    f(s);
+    assert(s == 2 * 10 + 21);
+    string g(int ref h) {
+        h = h + 37;
+        return "fuction assigmnent worked successfully";
+    };
+    f = g;
+    f(s);
+    assert(s == 2 * 10 + 21 + 37); 
+    return 0;
+}

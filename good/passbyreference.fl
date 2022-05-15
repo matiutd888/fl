@@ -1,11 +1,8 @@
-int f(int ref y) {
-    y = y + 1;
-    return 2;
+int increment(int ref n) {
+    n = n + 1;
 }
 
 int main() {
-    int x = 3;
-    printInt(f(x));
-    printInt(x);
-    return 0;
+    int x = 10;
+    printInt(increment(x));
 }

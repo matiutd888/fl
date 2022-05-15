@@ -1,0 +1,61 @@
+// Lambda, closure.
+function<int()> counter(function<int()> initialValueGenerator) {
+    int x = initialValueGenerator() - 1;
+    return lambda: () -> int {
+        x = x + 1;
+        return x;
+    };
+}
+  
+void callTwoTimes(function<int()> ref f) {
+    int f() {
+      return 42;
+    };
+    
+    f = lambda: () -> int {
+        return 13;
+    };
+}
+
+
+// Type with reference.
+function<void(int ref)> adder(int c) {
+    return lambda: (int ref x) -> void {
+        x = x + c;
+    };
+}
+
+function<int(int)> g(int ref x) {
+	return lambda: (int c)  -> int {
+    x = x + c;
+    return x;
+	};
+}
+
+
+int main() {
+    function<int()> f = counter(lambda: () -> int {
+        return 12;
+    } );
+    assert(f() == 12); // 12
+    assert(f() == 13); // 13
+    assert(f() == 14); // 14
+    
+    // Passing lambda by reference.
+    callTwoTimes(f);
+    assert(f() == 13);
+    
+    function<void(int ref)> p = adder(10);
+    int x = 0;
+    p(x);
+    assert(x == 10);
+    
+    // Weirdly, this works.
+    function<int(int)> z;
+    {
+      int x = 12;
+      z = g(x);
+    }  
+    assert(z(10) == 22);
+    return 0;
+}

@@ -1,0 +1,52 @@
+int main () {
+
+    // 1. Trzy typy wartości, literały
+    string s = "foo";
+    int x = 10;
+    bool t = true;
+    bool f = false;
+
+    // Arytmetyka, z = (10 / 4) * 5 = 10
+    int z = 10 / 4 * 5;
+
+    // Wiązanie do lewej, wiazanieDoLewej = 8
+    int wiazanieDoLewej = 10 - 4 + 2;
+    assert(wiazanieDoLewej == 8);
+    
+    
+    // Porównania.
+    bool czy = 10 > 3;
+    assert(czy);
+    
+    // Program nie wypisuje błędu (przerwanie ANDa podczas napotkania fałszywego pierwszego warunku).
+    bool bAnd = x > 10 && (z / 0) > 0; // bAnd = false;
+    bool bFalse = x <= 10 || (z / 0) > 0; // bAnd = true; 
+    
+    assert(t);
+    printBool(t);
+    
+    assert(!f);
+    
+    assert(x == 10);
+    printInt(x);
+    
+    printString(s);
+    assert(s == "foo");
+    
+    // Zmienne, operacja przypisania
+    t = false;
+    assert(!t);
+
+    int increment(int ref p) {
+        p = p + 1;
+        return p;
+    };
+
+    x = 4;
+    assert(increment(x) + x == 10);
+
+    int y = 4;
+    assert(y + increment(y) == 9);
+    
+    return 0;
+}

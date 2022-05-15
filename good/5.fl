@@ -1,0 +1,21 @@
+int main() {
+    int n = 5;
+
+    // Program obliczający silnię
+    int it = 1;
+    int result = 1;
+    while(it <= n) {
+        result = it * result;
+        it = it + 1;
+    }
+    assert(result == 120);
+
+    // Program sprawdzający czy liczba jest parzysta
+    if (n % 2 == 0) {
+        printString("Liczba parzysta");
+    }
+    else {
+        printString("Liczba nieparzysta");
+    }
+    return 0;
+}

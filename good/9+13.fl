@@ -1,0 +1,66 @@
+int f() {
+    int x = 0;
+    {   
+        x = 1; 
+        int x;
+        {
+            x = 2;
+            string x = "a";
+            assert(x == "a");
+        }
+        assert(x == 2);
+    }
+    assert(x == 1);
+    return 0;
+}
+
+void g(int ref x) {
+    x = x - 1;
+}
+
+void h() {
+    int z = 0;
+    {
+        g(z);
+        assert(z == -1);
+    
+        void g(int ref x) {
+            x = x + 1;
+        };
+        g(z);
+        assert(z == 0);
+    
+        void h(int ref x) {
+          x = x + 2;
+        };
+        h(z);
+        assert(z == 2);
+    }
+}
+
+int main() {
+    {
+        int x = 0;
+
+        // W obrębie bloku nie można zrobić ponownej deklaracji.
+        // Odkomentowanie poniższej linijki będzie skutkowało błędem.
+        // int x = 1;
+    }
+    f();
+    h();
+    
+    
+    function<int()> g = lambda: () -> int {
+        return 42;
+    };
+    assert(g() == 42);
+    int g() {
+      return 17;
+    };
+    
+    // Function does NOT shadow variable.
+    assert(g() != 17);
+    assert(g() == 42);
+    
+    return 0;
+}
