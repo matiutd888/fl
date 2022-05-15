@@ -55,7 +55,21 @@ typeOfExpr (A.EAnd pos e1 e2) = typeOfBinOp A.Bool A.Bool pos e1 e2
 typeOfExpr (A.EOr pos e1 e2) = typeOfBinOp A.Bool A.Bool pos e1 e2
 typeOfExpr (A.EAdd pos e1 _ e2) = typeOfBinOp A.Int A.Int pos e1 e2
 typeOfExpr (A.EMul pos e1 _ e2) = typeOfBinOp A.Int A.Int pos e1 e2
-typeOfExpr (A.ERel pos e1 _ e2) = typeOfBinOp A.Int A.Bool pos e1 e2
+typeOfExpr (A.ERel pos e1 relop e2) = do
+  t1 <- typeOfExpr e1
+  t2 <- typeOfExpr e2
+  assertM (typesEq t1 t2) $
+    showPosition pos ++
+    "comparing values of diferent type, " ++
+    printTree t1 ++ " and " ++ printTree t2
+  checkComparable t1
+  return $ A.Bool pos
+  where
+    checkComparable :: A.Type -> ExprTEval ()
+    checkComparable (A.Tuple _ listOfTypes) = mapM_ checkComparable listOfTypes
+    checkComparable f@(A.Function _ _ _) =
+      throwError $ showPosition pos ++ printTree f ++ "type is not comparable"
+    checkComparable _ = return ()
 -- Unary operator expressions.
 typeOfExpr (A.Not pos e) = do
   typeOfExpr e >>= checkForType A.Bool pos

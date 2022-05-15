@@ -177,12 +177,46 @@ evalExpr (A.EOr pos e1 e2) = do
   n1 <- evalExpr e1 >>= fromBool (A.hasPosition e1)
   n2 <- evalExpr e2 >>= fromBool (A.hasPosition e2)
   return $ Bool $ n1 || n2
-evalExpr (A.ERel pos e1 () e2) = do
-
-evalExpr (A.ERel pos e1 relop e2) = do
-  n1 <- evalExpr e1 >>= fromInt (A.hasPosition e1)
-  n2 <- evalExpr e2 >>= fromInt (A.hasPosition e2)
-  return $ Bool $ (operation relop) n1 n2
+evalExpr (A.ERel pos e1 relop e2) =
+  handleDoubleExpression
+    (operation relop)
+    (operation relop)
+    (operation relop)
+    pos
+    e1
+    e2
+  where
+    compareData ::
+         MonadError String m
+      => A.BNFC'Position
+      -> (Integer -> Integer -> Bool)
+      -> (String -> String -> Bool)
+      -> (Bool -> Bool -> Bool)
+      -> Data
+      -> Data
+      -> m Bool
+    compareData _ cInt cString cBool (Int i1) (Int i2) = return $ i1 `cInt` i2
+    compareData _ cInt cString cBool (Bool b1) (Bool b2) =
+      return $ b1 `cBool` b2
+    compareData _ cInt cString cBool (Str s1) (Str s2) =
+      return $ s1 `cString` s2
+    compareData p cInt cString cBool (Tuple d1) (Tuple d2) =
+      and <$> zipWithM (compareData p cInt cString cBool) d1 d2
+    compareData pos _ _ _ _ _ =
+      throwError $ showPosition pos ++ typeCheckerError ++ " comparision error"
+    handleDoubleExpression ::
+         (Integer -> Integer -> Bool)
+      -> (String -> String -> Bool)
+      -> (Bool -> Bool -> Bool)
+      -> A.BNFC'Position
+      -> A.Expr
+      -> A.Expr
+      -> EvalT Data
+    handleDoubleExpression f g h pos e1 e2 = do
+      d1 <- evalExpr e1
+      d2 <- evalExpr e2
+      b <- lift $ compareData pos f g h d1 d2
+      return $ Bool b
 evalExpr (A.EVar pos ident) = do
   env <- ask
   s <- get

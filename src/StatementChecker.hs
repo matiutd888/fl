@@ -13,14 +13,14 @@ import Errors
 import PrintGramatyka (printTree)
 import TypeChecker (ExprEnv(ExprEnv), getArgType, runExprTEval, typeOfExpr)
 import Utils
-  ( assertM
+  ( assert
+  , assertM
   , checkIfMainDef
   , isType
   , printBool
   , printInt
   , printString
   , typesEq
-  , assert
   )
 
 -- Variables (holds variables of any type).
