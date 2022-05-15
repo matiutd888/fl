@@ -1,4 +1,4 @@
-import StatementChecker
+import CheckType
 import Interpreter
 import TestProgram
 import System.IO
