@@ -136,6 +136,7 @@ typeStmt (BStmt _ (Block pos stmts)) = do
   return ()
 
 handleTupleIdent :: A.TupleIdent -> A.Type -> StmtTEval ()
+handleTupleIdent (A.TupleNoIdent pos) _ = return () 
 handleTupleIdent (A.TupleIdent pos ident) t
   -- Same code as during assignment, only don't check the type of expression 
   -- (as we know the type from typing the tuple).

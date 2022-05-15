@@ -353,6 +353,7 @@ evalStmt (A.TupleAss p tupleIdents expr) = do
   ask
   where
     handleIdent :: A.TupleIdent -> Data -> EvalT Env
+    handleIdent (A.TupleNoIdent _) _ = ask
     handleIdent (A.TupleIdent pos ident) d = do
       env <- ask
       l <-
@@ -431,8 +432,8 @@ runInterpreter p =
   runEvalT (addPrintFunctions initEnv) initStore $ evalProgram p
 
 operation :: A.RelOp -> (Integer -> Integer -> Bool)
-operation (A.LTH _) = (<)
-operation (A.LE _) = (<=)
+operation (A.LTH _) = (<) 
+operation (A.LE _) = (<=) 
 operation (A.GTH _) = (>)
 operation (A.GE _) = (>=)
 operation (A.EQU _) = (==)
