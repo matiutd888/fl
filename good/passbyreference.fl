@@ -1,0 +1,11 @@
+int f(int ref y) {
+    y = y + 1;
+    return 2;
+}
+
+int main() {
+    int x = 3;
+    printInt(f(x));
+    printInt(x);
+    return 0;
+}

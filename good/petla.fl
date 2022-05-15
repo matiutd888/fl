@@ -1,0 +1,11 @@
+int main() {
+    int x = 2;
+    while(x != 4) {
+        printString("przed");
+        printInt(x);
+        x = x + 1;
+        printString("po");
+        printInt(x);
+    }
+    return 0;   
+}

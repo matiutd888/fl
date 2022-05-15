@@ -1,0 +1,9 @@
+int main() {
+    int x = 10;
+    {
+        x = 5;
+        string x = "siema";
+        printString(x);
+    }
+    return 0;
+}

@@ -1,0 +1,35 @@
+// Lambda, closure.
+function<int()> counter(function<int()> initialValueGenerator) {
+    int x = initialValueGenerator() - 1;
+    // Lambda musi mieć swoje środowisko zapamiętane i tyle?.
+    return lambda: () -> int {
+        x = x + 1;
+        return x;
+    };
+}
+
+void wywolajDwaRazy(function<int()> ref f) {
+    f();
+    f();
+    printInt(f());
+    f = lambda: () -> int {
+        return 13;
+    };
+}
+
+int main() {
+    function<int()> f = counter(lambda: () -> int {
+        return 12;
+    } );
+    void a;
+    void g() {
+        return;
+    };
+    a = g();
+    printInt(f()); // 12
+    printInt(f()); // 13
+    printInt(f()); // 14
+    wywolajDwaRazy(f);
+    printInt(f());
+    return 0;
+}
