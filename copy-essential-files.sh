@@ -1,3 +1,3 @@
-cp build/AbsGramatyka.hs src/
-cp build/PrintGramatyka.hs src/
-cp build/LexGramatyka.hs src/
+cp build/*.hs src/
+cp TestGramatyka.hs src/
+

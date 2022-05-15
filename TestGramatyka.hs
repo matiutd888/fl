@@ -13,17 +13,21 @@ import Prelude
   , IO, (>>), (>>=), mapM_, putStrLn
   , FilePath
   , getContents, readFile
+  , fromInteger
   )
 import System.Environment ( getArgs )
-import System.Exit        ( exitFailure )
+import System.Exit        
 import Control.Monad      ( when )
 
-import AbsGramatyka   ()
+import AbsGramatyka   (Program)
 import LexGramatyka   ( Token, mkPosToken )
 import ParGramatyka   ( pProgram, myLexer )
 import PrintGramatyka ( Print, printTree )
 import SkelGramatyka  ()
 import System.IO (putStr)
+
+import Interpreter
+import CheckType
 
 type Err        = Either String
 type ParseFun a = [Token] -> Err a
@@ -32,10 +36,10 @@ type Verbosity  = Int
 putStrV :: Verbosity -> String -> IO ()
 putStrV v s = when (v > 1) $ putStrLn s
 
-runFile :: (Print a, Show a) => Verbosity -> ParseFun a -> FilePath -> IO ()
+runFile :: Verbosity -> ParseFun Program -> FilePath -> IO ()
 runFile v p f = putStrLn f >> readFile f >>= run v p
 
-run :: (Print a, Show a) => Verbosity -> ParseFun a -> String -> IO ()
+run :: Verbosity -> ParseFun Program -> String -> IO ()
 run v p s =
   case p ts of
     Left err -> do
@@ -45,29 +49,31 @@ run v p s =
       putStrLn err
       exitFailure
     Right tree -> do
-    --   putStrLn "\nParse Successful!"
-      showTree v tree
+      runProgram tree
   where
+  
   ts = myLexer s
   showPosToken ((l,c),t) = concat [ show l, ":", show c, "\t", show t ]
-
-header :: String
-header = "module TestProgram where\nimport AbsGramatyka\np::Program\np="
-
-showTree :: (Show a, Print a) => Int -> a -> IO ()
-showTree v tree = do
-    putStr header
-    putStrV v $ show tree
--- putStrV v $ "\n[Linearized tree]\n\n" ++ printTree tree
+  
+  
+  runProgram p = do
+    case runTypeChecker p of
+      Left m -> putStr m
+      _ -> 
+        do 
+          interpreterOutput <- runInterpreter p
+          case interpreterOutput of
+            Left m -> putStr m
+            Right (exitCode, _) -> case exitCode of
+              0 -> exitSuccess
+              p -> exitWith $ ExitFailure $ Prelude.fromInteger p
 
 usage :: IO ()
 usage = do
   putStrLn $ unlines
     [ "usage: Call with one of the following argument combinations:"
     , "  --help          Display this help message."
-    , "  (no arguments)  Parse stdin verbosely."
-    , "  (files)         Parse content of files verbosely."
-    , "  -s (files)      Silent mode. Parse content of files silently."
+    , "  (file)         Interpret content of the file"
     ]
 
 main :: IO ()
@@ -75,7 +81,5 @@ main = do
   args <- getArgs
   case args of
     ["--help"] -> usage
-    []         -> getContents >>= run 2 pProgram
-    "-s":fs    -> mapM_ (runFile 0 pProgram) fs
-    fs         -> mapM_ (runFile 2 pProgram) fs
+    [f]        ->  runFile 2 pProgram f
 
