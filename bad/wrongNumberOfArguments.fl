@@ -1,0 +1,7 @@
+int main() {
+  int f(string s) {
+    return 12;
+  };
+  f("cześć", 13);
+  return 0;
+}

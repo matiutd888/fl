@@ -250,6 +250,7 @@ typeStmt (A.DeclStmt _ (A.Decl pos t items)) = do
       return ()
 typeStmt (A.DeclStmt _ (A.FDecl pos retType ident params body)) = do
   env <- get
+  checkFunctionLevel pos ident
   let newFunctions =
         M.insert
           ident
