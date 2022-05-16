@@ -84,7 +84,7 @@ usage = do
     unlines
       [ "usage: Call with one of the following argument combinations:"
       , "  --help         Display this help message."
-      , "  (no arguments) Interpret stdin."  
+      , "  (no arguments) Interpret stdin."
       , "  (file)         Interpret content of the file."
       ]
 
