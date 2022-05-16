@@ -36,10 +36,6 @@ Empty.     Stmt ::= ";" ;
 BStmt.     Stmt ::= Block ;
 
 Decl.      Decl ::= Type [Item] ";" ;
-
--- [M] Dodatek, zmienne niemutowalne
-
--- ConstDecl. Decl ::= "const" Type [Item] ";";
  
 FDecl.     Decl ::= Type Ident "(" [Arg] ")" Block ";" ;
 
@@ -95,9 +91,6 @@ Bool.      Type ::= "bool" ;
 
 Void.      Type ::= "void" ;
 
--- internal NoType. Type ::= "()";
-
--- internal   Fun. Type ::= Type "(" [Type] ")" ;
 
 -- [M] Tuple.
 
@@ -110,8 +103,6 @@ Function. Type ::= "function" "<" Type "(" [ArgType] ")" ">";
 separator  Type "," ;
 
 -- Expressions ---------------------------------------------
-
--- [M] Być może to będzie deklaracja reguły dla dostępu do wartości krotki poprzez index.
 
 ETuple. Expr6 ::= "[" [Expr] "]" ;
 
@@ -179,10 +170,6 @@ GE.        RelOp ::= ">=" ;
 EQU.       RelOp ::= "==" ;
 
 NE.        RelOp ::= "!=" ;
-
--- [M] pomysł, podnoszenie do potęgi
-
--- POW.       RelOp ::= "^";
 
 -- comments ------------------------------------------------
 

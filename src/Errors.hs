@@ -14,7 +14,7 @@ showPositionOf :: A.HasPosition a => a -> String
 showPositionOf = showPosition . A.hasPosition
 
 showPosition :: BNFC'Position -> String
-showPosition Nothing = "NoPos: "
+showPosition Nothing = "noPos "
 showPosition (Just x) = show x ++ ": "
 
 unexpectedTypeMessage :: Type -> String
@@ -30,12 +30,12 @@ undefinedReferenceMessage (Ident x) pos =
 notAFunctionMessage :: BNFC'Position -> A.Type -> String
 notAFunctionMessage pos typeOfExpr =
   showPosition pos ++
-  " applying argument to expression of type " ++
+  "applying argument to expression of type " ++
   printTree typeOfExpr ++ ", that is not a function"
 
 errorWrongArgumentPassedByReference :: A.Expr -> ArgType -> String
 errorWrongArgumentPassedByReference expr arg =
   showPositionOf expr ++
-  " passing " ++
+  "passing " ++
   printTree expr ++
   " as an reference argument " ++ printTree arg ++ ", expected variable type"

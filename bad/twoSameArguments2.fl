@@ -1,0 +1,7 @@
+int main() {
+    lambda: (int x, int x) -> void {
+
+    };
+    return 0;
+
+}

@@ -232,7 +232,7 @@ evalExpr (A.EVar pos ident) = do
           throwError $
           runTimeError ++
           showPosition pos ++
-          " attempting to read the value of uinitialized value " ++
+          "attempting to read the value of uinitialized value " ++
           printTree ident
         x -> return x
 evalExpr (A.ETuple _ expressions) = do
