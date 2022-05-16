@@ -196,7 +196,6 @@ checkForType typeConstructor pos t =
     (errorMessageWrongType pos t $ typeConstructor pos)
 
 -- Statement typechecker
-
 type StmtTEval a = StateT Env (ExceptT String Identity) a
 
 incrementBlockLevel :: Env -> Env
@@ -379,13 +378,50 @@ typeTopDef (A.FnDef pos retType ident args body) =
 runStmtTEval :: Env -> StmtTEval a -> Either String (a, Env)
 runStmtTEval env e = runIdentity (runExceptT (runStateT e env))
 
+-- Build in functions
+printBool :: A.TopDef
+printBool =
+  FnDef
+    noPos
+    (A.Void noPos)
+    (A.Ident "printBool")
+    [A.Arg noPos (A.ArgT noPos (A.Bool noPos)) (A.Ident "x")]
+    (A.Block noPos [])
+
+printString :: A.TopDef
+printString =
+  FnDef
+    noPos
+    (A.Void noPos)
+    (A.Ident "printString")
+    [A.Arg noPos (A.ArgT noPos (A.Str noPos)) (A.Ident "x")]
+    (A.Block noPos [])
+
+printInt :: A.TopDef
+printInt =
+  FnDef
+    noPos
+    (A.Void noPos)
+    (A.Ident "printInt")
+    [A.Arg noPos (A.ArgT noPos (A.Int noPos)) (A.Ident "x")]
+    (A.Block noPos [])
+
+assert :: A.TopDef
+assert =
+  FnDef
+    noPos
+    (A.Void noPos)
+    (A.Ident "assert")
+    [A.Arg noPos (A.ArgT noPos (A.Bool noPos)) (A.Ident "x")]
+    (A.Block noPos [])
+
 addFunctions :: Env -> Env
 addFunctions e = snd $ DE.fromRight ((), initEnv) $ runStmtTEval e x
   where
     x = do
       typeTopDef printInt
       typeTopDef printBool
-      typeTopDef Utils.printString
+      typeTopDef CheckType.printString
       typeTopDef assert
 
 initEnv :: Env
