@@ -84,7 +84,8 @@ usage = do
     unlines
       [ "usage: Call with one of the following argument combinations:"
       , "  --help          Display this help message."
-      , "  (file)         Interpret content of the file"
+      , " (no arguments)  Interpret stdin verbosely."
+      , "  (file)         Interpret content of the file."
       ]
 
 main :: IO ()
@@ -92,5 +93,6 @@ main = do
   args <- getArgs
   case args of
     ["--help"] -> usage
+    [] -> getContents >>= runFile 2 pProgram
     [f] -> runFile 2 pProgram f
     _ -> hPutStrLn stderr "error" >> usage
