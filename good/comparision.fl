@@ -1,0 +1,4 @@
+int main() {
+    assert([1, ["a"]] < [2, ["b"]]);
+    return 0;
+}

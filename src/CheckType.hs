@@ -69,7 +69,7 @@ typeOfExpr (A.ERel pos e1 relop e2) = do
     checkComparable :: A.Type -> ExprTEval ()
     checkComparable (A.Tuple _ listOfTypes) = mapM_ checkComparable listOfTypes
     checkComparable f@(A.Function _ _ _) =
-      throwError $ showPosition pos ++ printTree f ++ "type is not comparable"
+      throwError $ showPosition pos ++ printTree f ++ " type is not comparable"
     checkComparable _ = return ()
 -- Unary operator expressions.
 typeOfExpr (A.Not pos e) = do
@@ -289,7 +289,8 @@ typeStmt (A.TupleAss pos tupleIdents expr) = do
   case typeOfExpr of
     A.Tuple p types -> do
       assertM (P.length types == P.length tupleIdents) $
-        showPosition pos ++ "error unpacking tuple, argument numbers don't match" 
+        showPosition pos ++
+        "error unpacking tuple, argument numbers don't match"
       zipWithM handleTupleIdent tupleIdents types
       return ()
     t ->
@@ -318,7 +319,8 @@ typeStmt (A.TupleAss pos tupleIdents expr) = do
       case t of
         A.Tuple p types -> do
           assertM (P.length types == P.length tupleIdents) $
-            showPosition pos ++ "error unpacking tuple, argument numbers don't match"
+            showPosition pos ++
+            "error unpacking tuple, argument numbers don't match"
           zipWithM handleTupleIdent tupleIdents types
           return ()
         wrongType ->

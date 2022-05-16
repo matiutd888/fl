@@ -1,0 +1,11 @@
+int main() {
+
+    void g;
+    void f() {
+        return;
+    };
+    g = f();
+    void x = f();
+    printString("OK");
+    return 0;
+}
