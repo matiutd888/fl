@@ -11,4 +11,5 @@ src/SkelGramatyka.hs
 src/TestGramatyka.hs
 src/TestProgram.hs
 src/TypeChecker.hs
-Interpreter
+interpreter
+src/grammar
