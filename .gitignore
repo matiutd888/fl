@@ -1,4 +1,14 @@
 build
 *.hi
 *.o
-
+przyklady
+src/AbsGramatyka.hs
+src/ErrM.hs
+src/LexGramatyka.hs
+src/ParGramatyka.hs
+src/PrintGramatyka.hs
+src/SkelGramatyka.hs
+src/TestGramatyka.hs
+src/TestProgram.hs
+src/TypeChecker.hs
+Interpreter
