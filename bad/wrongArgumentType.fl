@@ -1,0 +1,7 @@
+int main() {
+    void f(int x) {
+        return;
+    };
+    f("wrong argument");
+    return 0;
+}

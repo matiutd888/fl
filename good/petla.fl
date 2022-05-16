@@ -1,8 +1,0 @@
-int main() {
-    int x = 2;
-    while(x != 4) {
-        x = x + 1;
-    }
-    assert(x == 4);
-    return 0;   
-}

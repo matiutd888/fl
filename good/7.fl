@@ -1,8 +1,10 @@
-int increment(int ref n) {
+void increment(int ref n) {
     n = n + 1;
 }
 
 int main() {
     int x = 10;
-    printInt(increment(x));
+    increment(x);
+    assert(x == 11);
+    return 0;
 }

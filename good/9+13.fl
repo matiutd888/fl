@@ -39,13 +39,6 @@ void h() {
 }
 
 int main() {
-    {
-        int x = 0;
-
-        // W obrębie bloku nie można zrobić ponownej deklaracji.
-        // Odkomentowanie poniższej linijki będzie skutkowało błędem.
-        // int x = 1;
-    }
     f();
     h();
     
@@ -62,5 +55,29 @@ int main() {
     assert(g() != 17);
     assert(g() == 42);
     
+   // Static binding
+    function<int()> c;
+    {
+        int x = 10;
+        c = lambda: () -> int {
+            return x;   
+        };
+    }
+    assert(c() == 10);
+    
+    int f() {
+       return 1; 
+    };
+    assert(f() == 1);
+    {
+        string f() {
+            return "test";
+        };
+        assert(f() == "test");
+    }
+    assert(f() == 1);
+
+
+    printString("OK"); 
     return 0;
 }

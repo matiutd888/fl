@@ -1,0 +1,20 @@
+int main() {
+    int fib(int n, function<int(int, int)> op) {
+        if (n <= 1) {
+            return 1;
+        }
+        else {
+            return op(fib(n - 1, op), fib(n - 2, op));
+        }
+    };
+    int n = 1;
+    // Overshadowing
+    function<int(int, int)> operator = lambda: (int n, int z) -> int {
+        return n + z;
+    };
+    while(n <= 10) {
+        printInt(fib(n, operator));
+        n = n + 1;
+    }
+    return 0;
+}

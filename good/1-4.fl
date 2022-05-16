@@ -47,6 +47,6 @@ int main () {
 
     int y = 4;
     assert(y + increment(y) == 9);
-    
+    printString("OK");    
     return 0;
 }

@@ -195,7 +195,8 @@ checkForType typeConstructor pos t =
     (isType t typeConstructor)
     (errorMessageWrongType pos t $ typeConstructor pos)
 
--- END OF EXPRESSION CHECKER
+-- Statement typechecker
+
 type StmtTEval a = StateT Env (ExceptT String Identity) a
 
 incrementBlockLevel :: Env -> Env
