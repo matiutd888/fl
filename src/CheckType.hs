@@ -12,6 +12,7 @@ import qualified Data.Either as DE
 import qualified Data.Map as M
 import Data.Text
 import Errors
+import Prelude as P
 import PrintGramatyka
 import Utils
 
@@ -81,12 +82,11 @@ typeOfExpr (A.ETuple pos l)
   -- foldr (liftM2 (:)) (pure []) changes list of monads to monad of list.
   -- http://learnyouahaskell.com/functors-applicative-functors-and-monoids
  = do
-  listOfTypes <- Prelude.foldr (liftM2 (:)) (pure []) $ typeOfExpr <$> l
+  listOfTypes <- P.foldr (liftM2 (:)) (pure []) $ typeOfExpr <$> l
   return $ A.Tuple pos listOfTypes
 typeOfExpr (A.ELambda pos (A.Lambda _ arguments retType body)) = do
   env <- ask
-  let envWithAddedParams =
-        Prelude.foldr (addArgToEnv (level env + 1)) env arguments
+  let envWithAddedParams = P.foldr (addArgToEnv (level env + 1)) env arguments
   let blockEnv =
         env
           { functionType = retType
@@ -126,11 +126,16 @@ handleFunction :: BNFC'Position -> A.Type -> [A.Expr] -> ExprTEval A.Type
 handleFunction pos f args =
   case f of
     A.Function _ retType params ->
-      (checkArgsCorrectness params args) >>= (\_ -> return retType)
+      (checkArgsCorrectness pos params args) >>= (\_ -> return retType)
     _ -> throwError $ notAFunctionMessage pos f
 
-checkArgsCorrectness :: [A.ArgType] -> [A.Expr] -> ExprTEval ()
-checkArgsCorrectness params args = do
+checkArgsCorrectness ::
+     A.BNFC'Position -> [A.ArgType] -> [A.Expr] -> ExprTEval ()
+checkArgsCorrectness pos params args = do
+  assertM (P.length params == P.length args) $
+    showPosition pos ++
+    "function expected " ++
+    show (P.length params) ++ " argument(s), received " ++ show (P.length args)
   zipWithM checkArgCorrectness args params
   return ()
 
@@ -248,11 +253,10 @@ typeStmt (A.DeclStmt _ (A.FDecl pos retType ident params body)) = do
   let newFunctions =
         M.insert
           ident
-          (A.Function pos retType (Prelude.map getArgType params))
+          (A.Function pos retType (P.map getArgType params))
           (functions env)
   let newFunctionLevels = M.insert ident (level env) (functionLevels env)
-  let envWithAddedParams =
-        Prelude.foldr (addArgToEnv (level env + 1)) env params
+  let envWithAddedParams = P.foldr (addArgToEnv (level env + 1)) env params
   put $
     env
       { functions = newFunctions
@@ -283,8 +287,8 @@ typeStmt (A.TupleAss pos tupleIdents expr) = do
   typeOfExpr <- liftEither $ runExprTEval env (typeOfExpr expr)
   case typeOfExpr of
     A.Tuple p types -> do
-      assertM (Prelude.length types == Prelude.length tupleIdents) $
-        showPosition pos ++ "error unpacking tuple"
+      assertM (P.length types == P.length tupleIdents) $
+        showPosition pos ++ "error unpacking tuple, argument numbers don't match" 
       zipWithM handleTupleIdent tupleIdents types
       return ()
     t ->
@@ -312,8 +316,8 @@ typeStmt (A.TupleAss pos tupleIdents expr) = do
       env <- get
       case t of
         A.Tuple p types -> do
-          assertM (Prelude.length types == Prelude.length tupleIdents) $
-            showPosition pos ++ "error unpacking tuple"
+          assertM (P.length types == P.length tupleIdents) $
+            showPosition pos ++ "error unpacking tuple, argument numbers don't match"
           zipWithM handleTupleIdent tupleIdents types
           return ()
         wrongType ->
@@ -360,7 +364,7 @@ checkExpressionType t expr = do
 
 typeProgram :: A.Program -> StmtTEval ()
 typeProgram (A.Program pos functions) = do
-  assertM (Prelude.any checkIfMainDef functions) $ "no main function"
+  assertM (P.any checkIfMainDef functions) $ "no main function"
   mapM_ typeTopDef functions
   return ()
 
