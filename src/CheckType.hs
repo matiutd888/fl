@@ -92,7 +92,7 @@ typeOfExpr (A.ELambda pos (A.Lambda _ arguments retType body)) = do
           { functionType = retType
           , variableLevels = variableLevels envWithAddedParams
           , variables = variables envWithAddedParams
-      -- We do NOT add lambda to function environment (recursion not possible!).
+      -- We do NOT add lambda to function environment (recursion not possible).
           }
   liftEither $
     runStmtTEval blockEnv $ typeStmt $ A.BStmt (hasPosition body) body
@@ -360,7 +360,7 @@ checkExpressionType t expr = do
 
 typeProgram :: A.Program -> StmtTEval ()
 typeProgram (A.Program pos functions) = do
-  assertM (Prelude.any checkIfMainDef functions) $ "no main function!"
+  assertM (Prelude.any checkIfMainDef functions) $ "no main function"
   mapM_ typeTopDef functions
   return ()
 

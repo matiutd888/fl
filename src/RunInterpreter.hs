@@ -24,7 +24,7 @@ import LexGramatyka   ( Token, mkPosToken )
 import ParGramatyka   ( pProgram, myLexer )
 import PrintGramatyka ( Print, printTree )
 import SkelGramatyka  ()
-import System.IO (putStr)
+import System.IO (putStr, hPutStrLn, stderr)
 
 import Interpreter
 import CheckType
@@ -37,7 +37,7 @@ putStrV :: Verbosity -> String -> IO ()
 putStrV v s = when (v > 1) $ putStrLn s
 
 runFile :: Verbosity -> ParseFun Program -> FilePath -> IO ()
-runFile v p f = putStrLn f >> readFile f >>= run v p
+runFile v p f = readFile f >>= run v p
 
 run :: Verbosity -> ParseFun Program -> String -> IO ()
 run v p s =
@@ -58,12 +58,12 @@ run v p s =
   
   runProgram p = do
     case runTypeChecker p of
-      Left m -> putStr m
+      Left m -> hPutStrLn stderr m >> exitFailure
       _ -> 
         do 
           interpreterOutput <- runInterpreter p
           case interpreterOutput of
-            Left m -> putStr m
+            Left m -> hPutStrLn stderr m >> exitFailure
             Right (exitCode, _) -> case exitCode of
               0 -> exitSuccess
               p -> exitWith $ ExitFailure $ Prelude.fromInteger p
@@ -82,4 +82,4 @@ main = do
   case args of
     ["--help"] -> usage
     [f]        ->  runFile 2 pProgram f
-
+    _ -> hPutStrLn  stderr "error" >> usage

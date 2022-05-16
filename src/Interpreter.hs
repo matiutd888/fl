@@ -103,7 +103,7 @@ typeCheckerError :: String
 typeCheckerError = "TYPECHECKER ERROR "
 
 runTimeError :: String
-runTimeError = "Runtime error: "
+runTimeError = "Runtime error\n"
 
 fromInt :: A.BNFC'Position -> Data -> EvalT Integer
 fromInt pos (Int i) = return i
@@ -149,8 +149,9 @@ evalExpr (A.EMul pos e1 (A.Div _) e2) = do
   n1 <- evalExpr e1 >>= fromInt (A.hasPosition e1)
   n2 <- evalExpr e2 >>= fromInt (A.hasPosition e2)
   assertM (n2 /= 0) $
+    runTimeError ++
     showPosition pos ++
-    "attemtpting to perform division by zero, " ++
+    "attempting to perform division by zero, " ++
     printTree e2 ++ " is equal to zero"
   return $ Int $ div n1 n2
 evalExpr (A.EMul pos e1 (A.Mod _) e2) = do
@@ -158,7 +159,7 @@ evalExpr (A.EMul pos e1 (A.Mod _) e2) = do
   n2 <- evalExpr e2 >>= fromInt (A.hasPosition e2)
   assertM (n2 /= 0) $
     showPosition pos ++
-    "attemtpting to perform modulo by zero, " ++
+    "attempting to perform modulo by zero, " ++
     printTree e2 ++ " is equal to zero"
   return $ Int $ mod n1 n2
 evalExpr (A.EAdd pos e1 (A.Plus _) e2) = do
@@ -171,12 +172,14 @@ evalExpr (A.EAdd pos e1 (A.Minus _) e2) = do
   return $ Int $ n1 - n2
 evalExpr (A.EAnd pos e1 e2) = do
   n1 <- evalExpr e1 >>= fromBool (A.hasPosition e1)
-  n2 <- evalExpr e2 >>= fromBool (A.hasPosition e2)
-  return $ Bool $ n1 && n2
+  if not n1
+    then return (Bool False)
+    else Bool <$> (evalExpr e2 >>= fromBool (A.hasPosition e2))
 evalExpr (A.EOr pos e1 e2) = do
   n1 <- evalExpr e1 >>= fromBool (A.hasPosition e1)
-  n2 <- evalExpr e2 >>= fromBool (A.hasPosition e2)
-  return $ Bool $ n1 || n2
+  if n1
+    then return (Bool True)
+    else Bool <$> (evalExpr e2 >>= fromBool (A.hasPosition e2))
 evalExpr (A.ERel pos e1 relop e2) =
   handleDoubleExpression
     (operation relop)
@@ -264,7 +267,8 @@ functionFromSyntax fenv stmt args retType = do
         else do
           assertM
             (isType retType A.Void)
-            (showPosition pos ++
+            (runTimeError ++
+             showPosition pos ++
              "function returned no value, shoud return value of type " ++
              printTree retType)
           return $ Void
