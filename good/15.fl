@@ -23,9 +23,10 @@ int main() {
     assert(k == ["changed", 42]);
     
     // Zagnieżdzenie2;
-    tuple<int> t;
-    <s, t> = ["zagnieżdżenie2", [15]];
-    assert(t == [15]);
-    
+    tuple<int> z;
+    <_, z> = ["zagnieżdżenie2", [15]];
+    assert(z == [15]);
+   
+    printString("All examples ok!"); 
     return 0;
 }
