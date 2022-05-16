@@ -1,3 +1,3 @@
 cp build/*.hs src/
-cp TestGramatyka.hs src/
+cp RunInterpreter.hs src/
 
