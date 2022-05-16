@@ -55,6 +55,8 @@ separator nonempty Item "," ;
 
 TupleIdent. TupleIdent ::= Ident;
 
+TupleNoIdent. TupleIdent ::= "_";
+
 TupleRec. TupleIdent ::= "<" [TupleIdent] ">";
 
 separator nonempty TupleIdent ",";
