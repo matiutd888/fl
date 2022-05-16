@@ -10,7 +10,6 @@ import Control.Monad.Reader
 import Control.Monad.State
 import qualified Data.Either as DE
 import qualified Data.Map as M
-import Data.Text
 import Errors
 import Prelude as P
 import PrintGramatyka
@@ -56,7 +55,7 @@ typeOfExpr (A.EAnd pos e1 e2) = typeOfBinOp A.Bool A.Bool pos e1 e2
 typeOfExpr (A.EOr pos e1 e2) = typeOfBinOp A.Bool A.Bool pos e1 e2
 typeOfExpr (A.EAdd pos e1 _ e2) = typeOfBinOp A.Int A.Int pos e1 e2
 typeOfExpr (A.EMul pos e1 _ e2) = typeOfBinOp A.Int A.Int pos e1 e2
-typeOfExpr (A.ERel pos e1 relop e2) = do
+typeOfExpr (A.ERel pos e1 _ e2) = do
   t1 <- typeOfExpr e1
   t2 <- typeOfExpr e2
   assertM (typesEq t1 t2) $
@@ -86,13 +85,17 @@ typeOfExpr (A.ETuple pos l)
   return $ A.Tuple pos listOfTypes
 typeOfExpr (A.ELambda pos (A.Lambda _ arguments retType body)) = do
   env <- ask
-  let envWithAddedParams = P.foldr (addArgToEnv (level env + 1)) env arguments
+  let incrementedLevelEnv = incrementBlockLevel env
+  envWithAddedParams <-
+    foldM
+      (addArgToEnv (level incrementedLevelEnv))
+      incrementedLevelEnv
+      arguments
   let blockEnv =
-        env
+        incrementedLevelEnv
           { functionType = retType
           , variableLevels = variableLevels envWithAddedParams
           , variables = variables envWithAddedParams
-      -- We do NOT add lambda to function environment (recursion not possible).
           }
   liftEither $
     runStmtTEval blockEnv $ typeStmt $ A.BStmt (hasPosition body) body
@@ -142,7 +145,7 @@ checkArgsCorrectness pos params args = do
 checkArgCorrectness :: A.Expr -> A.ArgType -> ExprTEval ()
 checkArgCorrectness arg param =
   case param of
-    A.ArgRef pos ttype ->
+    A.ArgRef _ _ ->
       case arg of
         A.EVar _ ident
           -- We evaluate varType by hand because we don't want functions environment to be checked.
@@ -204,42 +207,42 @@ incrementBlockLevel env = env {level = (+ 1) $ level env}
 typeStmt :: A.Stmt -> StmtTEval ()
 typeStmt (A.Empty _) = return ()
 -- ~ typeStmt (BStmt pos (Block' a))
-typeStmt (A.Cond pos expr stmt) = do
+typeStmt (A.Cond _ expr stmt) = do
   checkExpressionType (A.Bool A.BNFC'NoPosition) expr
   env <- get
   put (incrementBlockLevel env) >> typeStmt stmt
   put env
-typeStmt (A.CondElse pos expr stmt1 stmt2) = do
+typeStmt (A.CondElse _ expr stmt1 stmt2) = do
   checkExpressionType (A.Bool A.BNFC'NoPosition) expr
   env <- get
   put (incrementBlockLevel env) >> typeStmt stmt1
   put (incrementBlockLevel env) >> typeStmt stmt2
   put env
-typeStmt (A.SExp pos expr) = do
+typeStmt (A.SExp _ expr) = do
   env <- get
   liftEither $ runExprTEval env (typeOfExpr expr)
   return ()
-typeStmt (A.While pos expr stmt) = do
+typeStmt (A.While _ expr stmt) = do
   checkExpressionType (A.Bool A.BNFC'NoPosition) expr
   env <- get
   put (incrementBlockLevel env) >> typeStmt stmt
   put env
-typeStmt (A.DeclStmt _ (A.Decl pos t items)) = do
+typeStmt (A.DeclStmt _ (A.Decl _ t items)) = do
   mapM_ (addItemToEnv t) items
   return ()
   where
     addItemToEnv :: A.Type -> A.Item -> StmtTEval ()
-    addItemToEnv t (A.NoInit pos ident) = do
+    addItemToEnv itemType (A.NoInit pos ident) = do
       env <- get
       checkVariableLevel pos ident
       put $
         env
-          { variables = M.insert ident t (variables env)
+          { variables = M.insert ident itemType (variables env)
           , variableLevels = M.insert ident (level env) (variableLevels env)
           }
       return ()
-    addItemToEnv t (A.Init pos ident expr) = do
-      checkExpressionType t expr
+    addItemToEnv itemType (A.Init pos ident expr) = do
+      checkExpressionType itemType expr
       checkVariableLevel pos ident
       env <- get
       put $
@@ -257,7 +260,9 @@ typeStmt (A.DeclStmt _ (A.FDecl pos retType ident params body)) = do
           (A.Function pos retType (P.map getArgType params))
           (functions env)
   let newFunctionLevels = M.insert ident (level env) (functionLevels env)
-  let envWithAddedParams = P.foldr (addArgToEnv (level env + 1)) env params
+  let incrementedLevel = level env + 1
+  envWithAddedParams <-
+    foldM (addArgToEnv incrementedLevel) (env {level = incrementedLevel}) params
   put $
     env
       { functions = newFunctions
@@ -265,10 +270,11 @@ typeStmt (A.DeclStmt _ (A.FDecl pos retType ident params body)) = do
       , variables = variables envWithAddedParams
       , functionLevels = newFunctionLevels
       , functionType = retType
+      , level = incrementedLevel
       }
   typeStmt $ A.BStmt (hasPosition body) body
   put $ env {functions = newFunctions, functionLevels = newFunctionLevels}
-typeStmt (A.Ret pos expr) = do
+typeStmt (A.Ret _ expr) = do
   env <- get
   checkExpressionType (functionType env) expr
   return ()
@@ -277,17 +283,17 @@ typeStmt (A.VRet pos) = do
   let voidType = A.Void pos
   assertM (typesEq voidType funcT) $ errorMessageWrongType pos voidType funcT
 typeStmt (A.Ass pos ident expr) = do
-  variables <- liftM variables get
-  case M.lookup ident variables of
+  vars <- liftM variables get
+  case M.lookup ident vars of
     Nothing ->
       throwError $
       showPosition pos ++ "attempting to assign to an undeclared variable"
     Just t -> checkExpressionType t expr
 typeStmt (A.TupleAss pos tupleIdents expr) = do
   env <- get
-  typeOfExpr <- liftEither $ runExprTEval env (typeOfExpr expr)
-  case typeOfExpr of
-    A.Tuple p types -> do
+  exprType <- liftEither $ runExprTEval env (typeOfExpr expr)
+  case exprType of
+    A.Tuple _ types -> do
       assertM (P.length types == P.length tupleIdents) $
         showPosition pos ++
         "error unpacking tuple, argument numbers don't match"
@@ -296,38 +302,39 @@ typeStmt (A.TupleAss pos tupleIdents expr) = do
     t ->
       throwError $
       showPosition pos ++
-      "attempting to unpack tuple with expression that is not a tuple"
+      "attempting to unpack tuple with expression of type " ++
+      printTree t ++ ", that is not a tuple"
   where
     handleTupleIdent :: A.TupleIdent -> A.Type -> StmtTEval ()
-    handleTupleIdent (A.TupleNoIdent pos) _ = return ()
-    handleTupleIdent (A.TupleIdent pos ident) t
+    handleTupleIdent (A.TupleNoIdent _) _ = return ()
+    handleTupleIdent (A.TupleIdent p ident) t
       -- Same code as during assignment, only don't check the type of expression 
       -- (as we know the type from typing the tuple).
      = do
-      variables <- liftM variables get
-      case M.lookup ident variables of
+      vars <- liftM variables get
+      case M.lookup ident vars of
         Nothing ->
           throwError $
-          showPosition pos ++ "attempting to assign to an undeclared variable"
+          showPosition p ++ "attempting to assign to an undeclared variable"
         Just varType ->
           assertM (typesEq varType t) $
-          showPosition pos ++
+          showPosition p ++
           "attempting to assign expression of type " ++
           printTree t ++ " to a variable of type " ++ printTree varType
-    handleTupleIdent (A.TupleRec pos tupleIdents) t = do
-      env <- get
+    handleTupleIdent (A.TupleRec _ idents) t = do
       case t of
-        A.Tuple p types -> do
-          assertM (P.length types == P.length tupleIdents) $
+        A.Tuple _ types -> do
+          assertM (P.length types == P.length idents) $
             showPosition pos ++
             "error unpacking tuple, argument numbers don't match"
-          zipWithM handleTupleIdent tupleIdents types
+          zipWithM handleTupleIdent idents types
           return ()
         wrongType ->
           throwError $
           showPosition pos ++
-          "attempting to unpack tuple with expression that is not a tuple"
-typeStmt (BStmt _ (Block pos stmts)) = do
+          "attempting to unpack tuple with expression of type " ++
+          printTree wrongType ++ ", that is not a tuple"
+typeStmt (BStmt _ (Block _ stmts)) = do
   env <- get
   put env {level = level env + 1}
   mapM_ typeStmt stmts
@@ -366,9 +373,9 @@ checkExpressionType t expr = do
   return ()
 
 typeProgram :: A.Program -> StmtTEval ()
-typeProgram (A.Program pos functions) = do
-  assertM (P.any checkIfMainDef functions) $ "no main function"
-  mapM_ typeTopDef functions
+typeProgram (A.Program _ funcs) = do
+  assertM (P.any checkIfMainDef funcs) $ "No main function"
+  mapM_ typeTopDef funcs
   return ()
 
 typeTopDef :: A.TopDef -> StmtTEval ()
@@ -440,14 +447,18 @@ runTypeChecker :: A.Program -> Either String ((), Env)
 runTypeChecker p = runStmtTEval initEnv (typeProgram p)
 
 -- Adds arg to variables map and levels map.
-addArgToEnv :: Int -> Arg -> Env -> Env
-addArgToEnv newLevel (Arg _ (ArgT _ t) ident) env =
-  env
-    { variables = M.insert ident t (variables env)
-    , variableLevels = M.insert ident newLevel (variableLevels env)
-    }
-addArgToEnv newLevel (Arg _ (ArgRef _ t) ident) env =
-  env
-    { variables = M.insert ident t (variables env)
-    , variableLevels = M.insert ident newLevel (variableLevels env)
-    }
+addArgToEnv :: MonadError String m => Int -> Env -> Arg -> m Env
+addArgToEnv newLevel env (Arg pos (ArgT _ t) ident) = do
+  liftEither $ runStmtTEval env $ checkVariableLevel pos ident
+  return
+    env
+      { variables = M.insert ident t (variables env)
+      , variableLevels = M.insert ident newLevel (variableLevels env)
+      }
+addArgToEnv newLevel env (Arg pos (ArgRef _ t) ident) = do
+  liftEither $ runStmtTEval env $ checkVariableLevel pos ident
+  return
+    env
+      { variables = M.insert ident t (variables env)
+      , variableLevels = M.insert ident newLevel (variableLevels env)
+      }

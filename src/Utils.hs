@@ -7,7 +7,7 @@ import AbsGramatyka as A
 import Control.Monad.Except
 
 checkIfMainDef :: A.TopDef -> Bool
-checkIfMainDef (A.FnDef pos retType ident args body) =
+checkIfMainDef (A.FnDef _ retType ident args _) =
   ident == A.Ident "main" && isType retType A.Int && args == []
 
 isType :: A.Type -> (BNFC'Position -> A.Type) -> Bool

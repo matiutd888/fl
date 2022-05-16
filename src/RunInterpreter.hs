@@ -8,10 +8,8 @@ import Prelude
   , FilePath
   , IO
   , Int
-  , Show
   , String
   , ($)
-  , (++)
   , (.)
   , (>)
   , (>>)
@@ -31,9 +29,8 @@ import System.Exit
 import AbsGramatyka (Program)
 import LexGramatyka (Token, mkPosToken)
 import ParGramatyka (myLexer, pProgram)
-import PrintGramatyka (Print, printTree)
 import SkelGramatyka ()
-import System.IO (hPutStrLn, putStr, stderr)
+import System.IO (hPutStrLn, stderr)
 
 import CheckType
 import Interpreter
@@ -64,19 +61,19 @@ run v p s =
   where
     ts = myLexer s
     showPosToken ((l, c), t) = concat [show l, ":", show c, "\t", show t]
-    runProgram p = do
-      case runTypeChecker p of
+    runProgram prog = do
+      case runTypeChecker prog of
         Left m ->
           hPutStrLn stderr "Static analysis failure" >> hPutStrLn stderr m >>
           exitFailure
         _ -> do
-          interpreterOutput <- runInterpreter p
+          interpreterOutput <- runInterpreter prog
           case interpreterOutput of
             Left m -> hPutStrLn stderr m >> exitFailure
             Right (exitCode, _) ->
               case exitCode of
                 0 -> exitSuccess
-                p -> exitWith $ ExitFailure $ Prelude.fromInteger p
+                failure -> exitWith $ ExitFailure $ Prelude.fromInteger failure
 
 usage :: IO ()
 usage = do

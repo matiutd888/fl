@@ -4,7 +4,6 @@ module Interpreter where
 
 import qualified AbsGramatyka as A
 import Control.Monad.Except
-import Control.Monad.Identity
 import Control.Monad.Reader
 import Control.Monad.State
 import qualified Data.Either as DE
@@ -15,7 +14,7 @@ import qualified Data.Set as S
 import Errors
 import PrintGramatyka (printTree)
 import System.IO
-import Utils (assertM, checkIfMainDef, isType, noPos)
+import Utils (assertM, isType, noPos)
 
 type Loc = Integer
 
@@ -28,17 +27,17 @@ data FunctionArg
 
 data FunctionData =
   FunctionData
-    { env :: Env
+    { functionEnvironment :: Env
     , functionEval :: A.BNFC'Position -> [FunctionArg] -> EvalT Data
     , arguments :: [A.Arg]
-    , retType :: A.Type
+    , returnType :: A.Type
     }
 
 compose :: a -> [a -> EvalT a] -> EvalT a
 compose a l = composeHelp a (reverse l)
   where
-    composeHelp a (x:xs) = composeHelp a xs >>= x
-    composeHelp a [] = return a
+    composeHelp y (x:xs) = composeHelp y xs >>= x
+    composeHelp y [] = return y
 
 propagateFlags :: Env -> EvalT Env
 propagateFlags newEnv =
@@ -97,7 +96,7 @@ initStore = Store M.empty 0
 type EvalT a = ReaderT Env (StateT Store (ExceptT String IO)) a
 
 runEvalT :: Env -> Store -> EvalT a -> IO (Either String (a, Store))
-runEvalT env state e = runExceptT (runStateT (runReaderT e env) state)
+runEvalT env st e = runExceptT (runStateT (runReaderT e env) st)
 
 typeCheckerError :: String
 typeCheckerError = "TYPECHECKER ERROR "
@@ -106,27 +105,27 @@ runTimeError :: String
 runTimeError = "Runtime error\n"
 
 fromInt :: A.BNFC'Position -> Data -> EvalT Integer
-fromInt pos (Int i) = return i
-fromInt pos d =
+fromInt _ (Int i) = return i
+fromInt pos _ =
   throwError $
   typeCheckerError ++ showPosition pos ++ "expected data of type int"
 
 -- ~ fromBool :: MonadError String m => A.BNFC'Position -> Data -> m Bool
 fromBool :: A.BNFC'Position -> Data -> EvalT Bool
-fromBool pos (Bool b) = return b
-fromBool pos d =
+fromBool _ (Bool b) = return b
+fromBool pos _ =
   throwError $
   typeCheckerError ++ showPosition pos ++ "expected data of type bool"
 
 fromFunction :: A.BNFC'Position -> Data -> EvalT FunctionData
-fromFunction pos (Function f) = return f
-fromFunction pos d =
+fromFunction _ (Function f) = return f
+fromFunction pos _ =
   throwError $
   typeCheckerError ++ showPosition pos ++ "expected data of type function"
 
 fromTuple :: A.BNFC'Position -> Data -> EvalT [Data]
-fromTuple pos (Tuple d) = return d
-fromTuple pos d =
+fromTuple _ (Tuple d) = return d
+fromTuple pos _ =
   throwError $
   typeCheckerError ++ showPosition pos ++ "expected data of type tuple"
 
@@ -141,7 +140,7 @@ evalExpr (A.Neg _ e) = do
 evalExpr (A.Not _ e) = do
   b <- evalExpr e >>= fromBool (A.hasPosition e)
   return $ Bool $ not b
-evalExpr (A.EMul pos e1 (A.Times _) e2) = do
+evalExpr (A.EMul _ e1 (A.Times _) e2) = do
   n1 <- evalExpr e1 >>= fromInt (A.hasPosition e1)
   n2 <- evalExpr e2 >>= fromInt (A.hasPosition e2)
   return $ Int $ n1 * n2
@@ -162,20 +161,20 @@ evalExpr (A.EMul pos e1 (A.Mod _) e2) = do
     "attempting to perform modulo by zero, " ++
     printTree e2 ++ " is equal to zero"
   return $ Int $ mod n1 n2
-evalExpr (A.EAdd pos e1 (A.Plus _) e2) = do
+evalExpr (A.EAdd _ e1 (A.Plus _) e2) = do
   n1 <- evalExpr e1 >>= fromInt (A.hasPosition e1)
   n2 <- evalExpr e2 >>= fromInt (A.hasPosition e2)
   return $ Int $ n1 + n2
-evalExpr (A.EAdd pos e1 (A.Minus _) e2) = do
+evalExpr (A.EAdd _ e1 (A.Minus _) e2) = do
   n1 <- evalExpr e1 >>= fromInt (A.hasPosition e1)
   n2 <- evalExpr e2 >>= fromInt (A.hasPosition e2)
   return $ Int $ n1 - n2
-evalExpr (A.EAnd pos e1 e2) = do
+evalExpr (A.EAnd _ e1 e2) = do
   n1 <- evalExpr e1 >>= fromBool (A.hasPosition e1)
   if not n1
     then return (Bool False)
     else Bool <$> (evalExpr e2 >>= fromBool (A.hasPosition e2))
-evalExpr (A.EOr pos e1 e2) = do
+evalExpr (A.EOr _ e1 e2) = do
   n1 <- evalExpr e1 >>= fromBool (A.hasPosition e1)
   if n1
     then return (Bool True)
@@ -198,15 +197,13 @@ evalExpr (A.ERel pos e1 relop e2) =
       -> Data
       -> Data
       -> m Bool
-    compareData _ cInt cString cBool (Int i1) (Int i2) = return $ i1 `cInt` i2
-    compareData _ cInt cString cBool (Bool b1) (Bool b2) =
-      return $ b1 `cBool` b2
-    compareData _ cInt cString cBool (Str s1) (Str s2) =
-      return $ s1 `cString` s2
+    compareData _ cInt _ _ (Int i1) (Int i2) = return $ i1 `cInt` i2
+    compareData _ _ _ cBool (Bool b1) (Bool b2) = return $ b1 `cBool` b2
+    compareData _ _ cString _ (Str s1) (Str s2) = return $ s1 `cString` s2
     compareData p cInt cString cBool (Tuple d1) (Tuple d2) =
       and <$> zipWithM (compareData p cInt cString cBool) d1 d2
-    compareData pos _ _ _ _ _ =
-      throwError $ showPosition pos ++ typeCheckerError ++ " comparision error"
+    compareData p _ _ _ _ _ =
+      throwError $ showPosition p ++ typeCheckerError ++ " comparision error"
     handleDoubleExpression ::
          (Integer -> Integer -> Bool)
       -> (String -> String -> Bool)
@@ -215,10 +212,10 @@ evalExpr (A.ERel pos e1 relop e2) =
       -> A.Expr
       -> A.Expr
       -> EvalT Data
-    handleDoubleExpression f g h pos e1 e2 = do
-      d1 <- evalExpr e1
-      d2 <- evalExpr e2
-      b <- lift $ compareData pos f g h d1 d2
+    handleDoubleExpression f g h position expr1 expr2 = do
+      d1 <- evalExpr expr1
+      d2 <- evalExpr expr2
+      b <- lift $ compareData position f g h d1 d2
       return $ Bool b
 evalExpr (A.EVar pos ident) = do
   env <- ask
@@ -238,10 +235,10 @@ evalExpr (A.EVar pos ident) = do
           " attempting to read the value of uinitialized value " ++
           printTree ident
         x -> return x
-evalExpr (A.ETuple pos expressions) = do
+evalExpr (A.ETuple _ expressions) = do
   values <- mapM evalExpr expressions
   return $ Tuple values
-evalExpr (A.ELambda pos (A.Lambda _ args rT block)) = do
+evalExpr (A.ELambda _ (A.Lambda _ args rT block)) = do
   e <- ask
   return $
     Function $
@@ -283,17 +280,17 @@ functionFromSyntax fenv stmt args retType = do
 
 handleFunction :: A.BNFC'Position -> FunctionData -> [A.Expr] -> EvalT Data
 handleFunction pos f exprs = do
-  arguments <- zipWithM handleArg (arguments f) exprs
-  (functionEval f) pos arguments
+  args <- zipWithM handleArg (arguments f) exprs
+  (functionEval f) pos args
   where
     handleArg :: A.Arg -> A.Expr -> EvalT FunctionArg
-    handleArg (A.Arg _ (A.ArgT pos t) _) expr =
+    handleArg (A.Arg _ (A.ArgT _ _) _) expr =
       evalExpr expr >>= \d -> return $ ArgCopy d
-    handleArg (A.Arg _ (A.ArgRef pos t) ident) expr =
-      evalWithLoc expr >>= \d -> return $ ArgRef d
+    handleArg (A.Arg _ (A.ArgRef _ _) _) expr =
+      evalWithLoc expr >>= \l -> return $ ArgRef l
 
 evalWithLoc :: A.Expr -> EvalT Loc
-evalWithLoc e@(A.EVar pos ident) = do
+evalWithLoc (A.EVar pos ident) = do
   env <- ask
   case M.lookup ident (variables env) of
     Just l -> return l
@@ -303,8 +300,9 @@ evalWithLoc e@(A.EVar pos ident) = do
 evalWithLoc e =
   throwError $ typeCheckerError ++ showPositionOf e ++ "not a variable"
 
+-- Statement evaluation
 evalStmt :: A.Stmt -> EvalT Env
-evalStmt (A.Empty pos) = ask
+evalStmt (A.Empty _) = ask
 evalStmt (A.Ass pos ident expr) = do
   env <- ask
   d <- evalExpr expr
@@ -322,8 +320,8 @@ evalStmt (A.CondElse pos e s1 s2) = do
      then evalStmt s1
      else evalStmt s2) >>=
     propagateFlags
-evalStmt s@(A.While pos e stmt) = do
-  b <- evalExpr e >>= fromBool pos
+evalStmt s@(A.While pos expr stmt) = do
+  b <- evalExpr expr >>= fromBool pos
   if b
     then do
       e <- evalStmt stmt >>= propagateFlags
@@ -331,14 +329,14 @@ evalStmt s@(A.While pos e stmt) = do
         then return e
         else evalStmt s
     else ask
-evalStmt (A.SExp pos e) = do
+evalStmt (A.SExp _ e) = do
   evalExpr e >> ask
-evalStmt (A.Ret pos e) = do
+evalStmt (A.Ret _ e) = do
   d <- evalExpr e
   putData retLoc d
-  e <- ask
-  return $ e {hasReturn = True}
-evalStmt (A.VRet pos) = do
+  env <- ask
+  return $ env {hasReturn = True}
+evalStmt (A.VRet _) = do
   putData retLoc Void
   e <- ask
   return $ e {hasReturn = True}
@@ -351,32 +349,23 @@ evalStmt (A.BStmt _ (A.Block _ stmts)) = do
       if (hasReturn e)
         then return e
         else local (\_ -> e) (evalStmt s)
-evalStmt (A.DeclStmt pos (A.Decl _ t items)) = do
+evalStmt (A.DeclStmt _ (A.Decl _ _ items)) = do
   env <- ask
   foldM handleItem env items
   where
     handleItem :: Env -> A.Item -> EvalT Env
-    handleItem newEnv (A.Init pos ident e) = do
+    handleItem newEnv (A.Init _ ident e) = do
       d <- local (\_ -> newEnv) $ evalExpr e
       l <- newLoc
       putData l d
       return newEnv {variables = M.insert ident l (variables newEnv)}
-    handleItem newEnv (A.NoInit pos ident) = do
+    handleItem newEnv (A.NoInit _ ident) = do
       l <- newLoc
       putData l NODATA
       return newEnv {variables = M.insert ident l (variables newEnv)}
-evalStmt (A.DeclStmt _ (A.FDecl pos retType ident args b)) = do
+evalStmt (A.DeclStmt _ (A.FDecl _ retType ident args b)) = do
   en <- ask
   return $ en {functions = M.insert ident (fix (phi en)) (functions en)}
-  -- Alternative, without fixpoint.
-  -- let newEnv =
-  --       en
-  --         { functions =
-  --             M.insert
-  --               ident
-  --               (FunctionData newEnv (A.BStmt (A.hasPosition b) b) args retType)
-  --               (functions env)
-  --         }
   where
     phi :: Env -> FunctionData -> FunctionData
     phi e f =
@@ -399,14 +388,14 @@ evalStmt (A.TupleAss p tupleIdents expr) = do
       l <-
         safeLookup (showPosition pos ++ typeCheckerError) ident (variables env)
       putData l d >> ask
-    handleIdent (A.TupleRec pos idents) (Tuple datas) = do
+    handleIdent (A.TupleRec _ idents) (Tuple datas) = do
       env <- ask
       compose env $ zipWith propagateEnv idents datas
         -- Here I propagate env, although it's not neccessary as env does not change during assignment.
       where
         propagateEnv :: A.TupleIdent -> Data -> Env -> EvalT Env
         propagateEnv ident d newEnv = local (\_ -> newEnv) $ handleIdent ident d
-    handleIdent (A.TupleRec pos idents) _ =
+    handleIdent (A.TupleRec pos _) _ =
       throwError $
       typeCheckerError ++ showPosition pos ++ " error unpacking tuple"
 
@@ -416,9 +405,9 @@ evalTopDef (A.FnDef pos retType ident args body) newEnv =
   evalStmt (A.DeclStmt pos (A.FDecl pos retType ident args body))
 
 evalProgram :: A.Program -> EvalT Integer
-evalProgram (A.Program pos functions) = do
+evalProgram (A.Program _ funcs) = do
   env <- ask
-  envWithFunctions <- compose env $ map evalTopDef functions
+  envWithFunctions <- compose env $ map evalTopDef funcs
   let mainCall = A.EApp noPos (A.IdentCallee noPos (A.Ident "main")) []
   local (\_ -> envWithFunctions) (evalExpr mainCall) >>= fromInt noPos
 
@@ -430,7 +419,7 @@ printBool =
     [A.Arg noPos (A.ArgT noPos (A.Bool noPos)) (A.Ident "x")]
     (A.Void noPos)
   where
-    evalPrint p [ArgCopy (Bool b)] = liftIO (putStrLn $ show b) >> return Void
+    evalPrint _ [ArgCopy (Bool b)] = liftIO (putStrLn $ show b) >> return Void
     evalPrint p _ = throwError $ showPosition p ++ "wrong use of printBool"
 
 printInt :: FunctionData
@@ -441,7 +430,7 @@ printInt =
     [A.Arg noPos (A.ArgT noPos (A.Int noPos)) (A.Ident "x")]
     (A.Void noPos)
   where
-    evalPrint p [ArgCopy (Int n)] = liftIO (putStrLn $ show n) >> return Void
+    evalPrint _ [ArgCopy (Int n)] = liftIO (putStrLn $ show n) >> return Void
     evalPrint p _ = throwError $ showPosition p ++ "wrong use of printInt"
 
 printString :: FunctionData
@@ -452,7 +441,7 @@ printString =
     [A.Arg noPos (A.ArgT noPos (A.Str noPos)) (A.Ident "x")]
     (A.Void noPos)
   where
-    evalPrint p [ArgCopy (Str s)] = liftIO (putStrLn s) >> return Void
+    evalPrint _ [ArgCopy (Str s)] = liftIO (putStrLn s) >> return Void
     evalPrint p _ = throwError $ showPosition p ++ "wrong use of printString"
 
 assert :: FunctionData

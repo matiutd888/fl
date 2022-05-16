@@ -3,7 +3,6 @@
 module Errors where
 
 import AbsGramatyka as A
-import Control.Monad.Except
 import PrintGramatyka
 
 errorMessageWrongType :: BNFC'Position -> A.Type -> A.Type -> String
@@ -29,8 +28,10 @@ undefinedReferenceMessage (Ident x) pos =
   showPosition pos ++ "undefined reference " ++ show x
 
 notAFunctionMessage :: BNFC'Position -> A.Type -> String
-notAFunctionMessage pos expr =
-  showPosition pos ++ " applying argument to expression that is not a function"
+notAFunctionMessage pos typeOfExpr =
+  showPosition pos ++
+  " applying argument to expression of type " ++
+  printTree typeOfExpr ++ ", that is not a function"
 
 errorWrongArgumentPassedByReference :: A.Expr -> ArgType -> String
 errorWrongArgumentPassedByReference expr arg =
