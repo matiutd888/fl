@@ -1,0 +1,7 @@
+int main() {
+    if (1 < 2) {
+        printInt(1);
+        printInt(2);
+    }
+    return 0;
+}

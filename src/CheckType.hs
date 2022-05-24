@@ -207,16 +207,16 @@ incrementBlockLevel env = env {level = (+ 1) $ level env}
 typeStmt :: A.Stmt -> StmtTEval ()
 typeStmt (A.Empty _) = return ()
 -- ~ typeStmt (BStmt pos (Block' a))
-typeStmt (A.Cond _ expr stmt) = do
+typeStmt (A.Cond _ expr block) = do
   checkExpressionType (A.Bool A.BNFC'NoPosition) expr
   env <- get
-  put (incrementBlockLevel env) >> typeStmt stmt
+  typeStmt (A.BStmt (hasPosition block) block)
   put env
-typeStmt (A.CondElse _ expr stmt1 stmt2) = do
+typeStmt (A.CondElse _ expr b1 b2) = do
   checkExpressionType (A.Bool A.BNFC'NoPosition) expr
   env <- get
-  put (incrementBlockLevel env) >> typeStmt stmt1
-  put (incrementBlockLevel env) >> typeStmt stmt2
+  typeStmt $ A.BStmt (hasPosition b1) b1
+  put env >> (typeStmt (A.BStmt (hasPosition b2) b2))
   put env
 typeStmt (A.SExp _ expr) = do
   env <- get
@@ -225,7 +225,7 @@ typeStmt (A.SExp _ expr) = do
 typeStmt (A.While _ expr stmt) = do
   checkExpressionType (A.Bool A.BNFC'NoPosition) expr
   env <- get
-  put (incrementBlockLevel env) >> typeStmt stmt
+  typeStmt stmt
   put env
 typeStmt (A.DeclStmt _ (A.Decl _ t items)) = do
   mapM_ (addItemToEnv t) items
@@ -336,7 +336,7 @@ typeStmt (A.TupleAss pos tupleIdents expr) = do
           printTree wrongType ++ ", that is not a tuple"
 typeStmt (BStmt _ (Block _ stmts)) = do
   env <- get
-  put env {level = level env + 1}
+  put $ incrementBlockLevel env
   mapM_ typeStmt stmts
   put env
   return ()

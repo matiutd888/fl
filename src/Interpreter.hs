@@ -309,16 +309,16 @@ evalStmt (A.Ass pos ident expr) = do
   l <- safeLookup (showPosition pos ++ typeCheckerError) ident (variables env)
   putData l d
   ask
-evalStmt (A.Cond pos expr stmt) = do
+evalStmt (A.Cond pos expr block) = do
   b <- evalExpr expr >>= fromBool pos
   if b
-    then evalStmt stmt >>= propagateFlags
+    then evalStmt (A.BStmt (A.hasPosition block) block) >>= propagateFlags
     else ask
-evalStmt (A.CondElse pos e s1 s2) = do
+evalStmt (A.CondElse pos e b1 b2) = do
   b <- evalExpr e >>= fromBool pos
   (if b
-     then evalStmt s1
-     else evalStmt s2) >>=
+     then evalStmt (A.BStmt (A.hasPosition b1) b1)
+     else evalStmt (A.BStmt (A.hasPosition b2) b2)) >>=
     propagateFlags
 evalStmt s@(A.While pos expr stmt) = do
   b <- evalExpr expr >>= fromBool pos

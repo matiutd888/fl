@@ -1,4 +1,4 @@
-for f in $(ls przyklady/*.fl)
+for f in $(ls good/*.fl)
 do
     echo $f
     if ! cat $f | build/./TestGramatyka ; then

@@ -12,9 +12,11 @@ int main() {
 
     // Program sprawdzający czy liczba jest parzysta
     if (n % 2 == 0) {
+        ;
         printString("Liczba parzysta");
     }
     else {
+        ;
         printString("Liczba nieparzysta");
     }
     return 0;
