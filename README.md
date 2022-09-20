@@ -1,5 +1,7 @@
 # Floyd
 
+Name genesis: Authors mood for Pink Floyd music while writing this project.
+
 Description in english in progress.
 
 Z małymi modyfikacjami udało mi się zaimplementować wszystkie cechy wymienione przy deklaracji.
