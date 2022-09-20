@@ -1,5 +1,7 @@
 # Floyd
 
+Description in english in progress.
+
 Z małymi modyfikacjami udało mi się zaimplementować wszystkie cechy wymienione przy deklaracji.
 Małe modyfikacje obejmują
 - Nie ma konkatenacji stringów.
