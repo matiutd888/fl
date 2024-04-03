@@ -1,6 +1,6 @@
 # Floyd
 
-Name genesis: The author was listening a lot to Pink Floyd music while writing this project.
+Name origins: The author was listening a lot to Pink Floyd music while writing this project.
 
 Description in English in progress.
 
